@@ -2,14 +2,17 @@ import {
   subscriptions, 
   userPreferences,
   telegramLinkTokens,
+  telegramPayments,
   type Subscription, 
   type InsertSubscription,
   type UserPreferences,
   type InsertUserPreferences,
-  type TelegramLinkToken
+  type TelegramLinkToken,
+  type TelegramPayment,
+  type InsertTelegramPayment
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, gt } from "drizzle-orm";
+import { eq, and, desc, lt, ne } from "drizzle-orm";
 
 export interface TelegramPaymentData {
   telegramUserId: string;
@@ -20,14 +23,23 @@ export interface TelegramPaymentData {
 export interface IStorage {
   getSubscription(userId: string): Promise<Subscription | undefined>;
   getSubscriptionByTelegramId(telegramUserId: string): Promise<Subscription | undefined>;
+  getSubscriptionsByTelegramId(telegramUserId: string): Promise<Subscription[]>;
   createOrUpdateSubscription(subscription: InsertSubscription): Promise<Subscription>;
-  activatePremiumByTelegram(telegramUserId: string, paymentData: TelegramPaymentData): Promise<Subscription | undefined>;
+  activatePremiumByUserId(userId: string, paymentData: TelegramPaymentData): Promise<Subscription | undefined>;
   linkTelegramAccount(userId: string, telegramUserId: string): Promise<Subscription | undefined>;
   getUserPreferences(userId: string): Promise<UserPreferences | undefined>;
   createOrUpdateUserPreferences(preferences: InsertUserPreferences): Promise<UserPreferences>;
   createTelegramLinkToken(userId: string): Promise<string>;
   getTelegramLinkToken(tokenId: string): Promise<TelegramLinkToken | undefined>;
   deleteTelegramLinkToken(tokenId: string): Promise<void>;
+  // Telegram payments
+  createTelegramPayment(payment: InsertTelegramPayment & { expiresAt: Date }): Promise<TelegramPayment>;
+  getTelegramPayment(paymentId: string): Promise<TelegramPayment | undefined>;
+  getPendingPaymentForUser(userId: string): Promise<TelegramPayment | undefined>;
+  markPaymentPaid(paymentId: string, chargeId: string): Promise<TelegramPayment | undefined>;
+  markPaymentExpired(paymentId: string): Promise<void>;
+  expireOldPayments(): Promise<void>;
+  getPaymentHistory(telegramUserId: string): Promise<TelegramPayment[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -63,29 +75,32 @@ export class DatabaseStorage implements IStorage {
     return subscription;
   }
 
-  async activatePremiumByTelegram(telegramUserId: string, paymentData: TelegramPaymentData): Promise<Subscription | undefined> {
+  async getSubscriptionsByTelegramId(telegramUserId: string): Promise<Subscription[]> {
+    return await db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.telegramUserId, telegramUserId));
+  }
+
+  async activatePremiumByUserId(userId: string, paymentData: TelegramPaymentData): Promise<Subscription | undefined> {
     const [subscription] = await db
       .update(subscriptions)
       .set({
         tier: "premium",
         maxWpm: 1000,
+        telegramUserId: paymentData.telegramUserId,
         telegramPaymentChargeId: paymentData.telegramPaymentChargeId,
         paidAt: paymentData.paidAt,
         updatedAt: new Date(),
       })
-      .where(eq(subscriptions.telegramUserId, telegramUserId))
+      .where(eq(subscriptions.userId, userId))
       .returning();
     return subscription;
   }
 
   async linkTelegramAccount(userId: string, telegramUserId: string): Promise<Subscription | undefined> {
-    // Check if telegram ID is already linked to another user
-    const existing = await this.getSubscriptionByTelegramId(telegramUserId);
-    if (existing && existing.userId !== userId) {
-      throw new Error("Telegram account already linked to another user");
-    }
-    
-    // Only allow linking if not already linked to a different telegram ID
+    // Now allows same Telegram ID to be linked to multiple app accounts
+    // Each app account can only have one Telegram ID though
     const currentSub = await this.getSubscription(userId);
     if (currentSub?.telegramUserId && currentSub.telegramUserId !== telegramUserId) {
       throw new Error("Account already linked to a different Telegram account");
@@ -166,6 +181,90 @@ export class DatabaseStorage implements IStorage {
 
   async deleteTelegramLinkToken(tokenId: string): Promise<void> {
     await db.delete(telegramLinkTokens).where(eq(telegramLinkTokens.id, tokenId));
+  }
+
+  // Telegram payments methods
+  async createTelegramPayment(payment: InsertTelegramPayment & { expiresAt: Date }): Promise<TelegramPayment> {
+    const [newPayment] = await db
+      .insert(telegramPayments)
+      .values({
+        ...payment,
+        status: "pending",
+        invoiceIssuedAt: new Date(),
+      })
+      .returning();
+    return newPayment;
+  }
+
+  async getTelegramPayment(paymentId: string): Promise<TelegramPayment | undefined> {
+    const [payment] = await db
+      .select()
+      .from(telegramPayments)
+      .where(eq(telegramPayments.id, paymentId));
+    return payment;
+  }
+
+  async getPendingPaymentForUser(userId: string): Promise<TelegramPayment | undefined> {
+    const now = new Date();
+    const [payment] = await db
+      .select()
+      .from(telegramPayments)
+      .where(
+        and(
+          eq(telegramPayments.userId, userId),
+          eq(telegramPayments.status, "pending"),
+          // Only get non-expired payments
+        )
+      )
+      .orderBy(desc(telegramPayments.createdAt))
+      .limit(1);
+    
+    if (payment && new Date(payment.expiresAt) > now) {
+      return payment;
+    }
+    return undefined;
+  }
+
+  async markPaymentPaid(paymentId: string, chargeId: string): Promise<TelegramPayment | undefined> {
+    const [payment] = await db
+      .update(telegramPayments)
+      .set({
+        status: "paid",
+        chargeId,
+        paidAt: new Date(),
+      })
+      .where(eq(telegramPayments.id, paymentId))
+      .returning();
+    return payment;
+  }
+
+  async markPaymentExpired(paymentId: string): Promise<void> {
+    await db
+      .update(telegramPayments)
+      .set({ status: "expired" })
+      .where(eq(telegramPayments.id, paymentId));
+  }
+
+  async expireOldPayments(): Promise<void> {
+    const now = new Date();
+    await db
+      .update(telegramPayments)
+      .set({ status: "expired" })
+      .where(
+        and(
+          eq(telegramPayments.status, "pending"),
+          lt(telegramPayments.expiresAt, now)
+        )
+      );
+  }
+
+  async getPaymentHistory(telegramUserId: string): Promise<TelegramPayment[]> {
+    return await db
+      .select()
+      .from(telegramPayments)
+      .where(eq(telegramPayments.telegramUserId, telegramUserId))
+      .orderBy(desc(telegramPayments.createdAt))
+      .limit(10);
   }
 }
 

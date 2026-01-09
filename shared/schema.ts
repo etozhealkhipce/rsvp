@@ -10,7 +10,7 @@ export const subscriptions = pgTable("subscriptions", {
   userId: varchar("user_id").notNull().unique(),
   tier: text("tier").notNull().default("free"),
   maxWpm: integer("max_wpm").notNull().default(350),
-  telegramUserId: text("telegram_user_id").unique(), // Unique to prevent multi-account abuse
+  telegramUserId: text("telegram_user_id"), // Not unique - one TG account can pay for multiple app accounts
   telegramPaymentChargeId: text("telegram_payment_charge_id").unique(), // Unique to prevent payment reuse
   paidAt: timestamp("paid_at"),
   createdAt: timestamp("created_at").defaultNow(),
@@ -57,3 +57,30 @@ export const telegramLinkTokens = pgTable("telegram_link_tokens", {
 });
 
 export type TelegramLinkToken = typeof telegramLinkTokens.$inferSelect;
+
+// Telegram payments - track all payment attempts and history
+export const telegramPayments = pgTable("telegram_payments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  telegramUserId: text("telegram_user_id").notNull(),
+  telegramChatId: text("telegram_chat_id").notNull(),
+  userId: varchar("user_id").notNull(), // App user this payment is for
+  userEmail: text("user_email"), // Store email for display purposes
+  chargeId: text("charge_id").unique(), // Telegram payment charge ID (unique to prevent double processing)
+  amount: integer("amount").notNull(), // Amount in Stars
+  status: text("status").notNull().default("pending"), // pending, paid, expired
+  invoiceIssuedAt: timestamp("invoice_issued_at").notNull().defaultNow(),
+  expiresAt: timestamp("expires_at").notNull(), // Invoice expiration time (1 minute)
+  paidAt: timestamp("paid_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertTelegramPaymentSchema = createInsertSchema(telegramPayments).pick({
+  telegramUserId: true,
+  telegramChatId: true,
+  userId: true,
+  userEmail: true,
+  amount: true,
+});
+
+export type InsertTelegramPayment = z.infer<typeof insertTelegramPaymentSchema>;
+export type TelegramPayment = typeof telegramPayments.$inferSelect;
