@@ -1,9 +1,12 @@
 import "dotenv/config";
+import * as crypto from "crypto";
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const WEBHOOK_URL = process.env.VITE_APP_URL 
   ? `${process.env.VITE_APP_URL}/api/telegram-webhook`
   : null;
+// Generate or use existing webhook secret for request verification
+const WEBHOOK_SECRET = process.env.TELEGRAM_WEBHOOK_SECRET || crypto.randomBytes(32).toString("hex");
 
 async function setupWebhook() {
   if (!BOT_TOKEN) {
@@ -26,7 +29,7 @@ async function setupWebhook() {
   const deleteData = await deleteResponse.json();
   console.log("Delete old webhook:", deleteData.ok ? "OK" : "Failed");
 
-  // Set new webhook
+  // Set new webhook with secret_token for verification
   const response = await fetch(
     `https://api.telegram.org/bot${BOT_TOKEN}/setWebhook`,
     {
@@ -34,7 +37,8 @@ async function setupWebhook() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         url: WEBHOOK_URL,
-        allowed_updates: ["message", "pre_checkout_query"],
+        allowed_updates: ["message", "pre_checkout_query", "successful_payment"],
+        secret_token: WEBHOOK_SECRET,
       }),
     }
   );
@@ -44,6 +48,14 @@ async function setupWebhook() {
   if (data.ok) {
     console.log("Webhook setup successful!");
     console.log("Description:", data.description);
+    
+    // Output the webhook secret if it was auto-generated
+    if (!process.env.TELEGRAM_WEBHOOK_SECRET) {
+      console.log("\n*** IMPORTANT ***");
+      console.log("Auto-generated TELEGRAM_WEBHOOK_SECRET. Add this to your environment:");
+      console.log(`TELEGRAM_WEBHOOK_SECRET=${WEBHOOK_SECRET}`);
+      console.log("This secret verifies that webhook requests come from Telegram.");
+    }
   } else {
     console.error("Webhook setup failed:", data.description);
     process.exit(1);

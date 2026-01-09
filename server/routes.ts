@@ -256,12 +256,25 @@ export async function registerRoutes(
     try {
       const update = req.body;
       const botToken = process.env.TELEGRAM_BOT_TOKEN;
-      const secret = process.env.TELEGRAM_TOKEN_SECRET || process.env.SESSION_SECRET || "fallback-secret";
+      const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+      const tokenSecret = process.env.TELEGRAM_TOKEN_SECRET || process.env.SESSION_SECRET || "fallback-secret";
       const starsPrice = parseInt(process.env.TELEGRAM_STARS_PRICE || "100", 10);
 
       if (!botToken) {
         console.error("TELEGRAM_BOT_TOKEN not configured");
         return res.json({ ok: true });
+      }
+      
+      // Verify webhook authenticity using Telegram's secret_token header
+      // This prevents forged requests from attackers
+      if (webhookSecret) {
+        const receivedSecret = req.headers["x-telegram-bot-api-secret-token"];
+        if (receivedSecret !== webhookSecret) {
+          console.error("Telegram webhook: Invalid secret token");
+          return res.status(401).json({ error: "Unauthorized" });
+        }
+      } else {
+        console.warn("TELEGRAM_WEBHOOK_SECRET not set - webhook requests are not verified");
       }
 
       // Handle /start command - link account with secure token
@@ -289,7 +302,7 @@ export async function registerRoutes(
             const expectedPayload = `${userId}:${timestamp}`;
             const expectedHashBuffer = await crypto.subtle.digest(
               "SHA-256", 
-              new TextEncoder().encode(expectedPayload + secret)
+              new TextEncoder().encode(expectedPayload + tokenSecret)
             );
             const expectedHash = Buffer.from(expectedHashBuffer).toString("base64").substring(0, 16);
             
