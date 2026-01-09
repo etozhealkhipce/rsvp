@@ -317,6 +317,11 @@ export async function registerRoutes(
       );
       console.log("Update type:", update.message ? "message" : update.pre_checkout_query ? "pre_checkout" : update.successful_payment ? "payment" : "unknown");
 
+      // Simple echo for debugging - remove after testing
+      if (update.message?.text && !update.message.text.startsWith("/")) {
+        await sendTelegramMessage(botToken, update.message.chat.id, `Echo: ${update.message.text}`);
+      }
+
       // Verify webhook authenticity using Telegram's secret_token header
       if (webhookSecret) {
         const receivedSecret = req.headers["x-telegram-bot-api-secret-token"];
