@@ -1,12 +1,14 @@
 import { useState, useEffect } from "react";
-import { Plus, BookOpen, Search, Library } from "lucide-react";
+import { motion } from "framer-motion";
+import { Plus, BookOpen, Search, Library, Sparkles, Zap, ArrowRight } from "lucide-react";
+import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Header } from "@/components/header";
 import { FileUpload } from "@/components/file-upload";
 import { TextCard } from "@/components/text-card";
-import { SubscriptionBadge } from "@/components/subscription-badge";
+import { FloatingElementsLight } from "@/components/floating-elements";
 import { getAllTexts, deleteText, type StoredText } from "@/lib/indexeddb";
 import { useToast } from "@/hooks/use-toast";
 
@@ -17,12 +19,32 @@ interface DashboardProps {
   subscriptionTier?: "free" | "premium";
 }
 
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1,
+    },
+  },
+};
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  visible: { 
+    opacity: 1, 
+    y: 0,
+    transition: { duration: 0.4, ease: "easeOut" }
+  },
+};
+
 export function Dashboard({ user, subscriptionTier = "free" }: DashboardProps) {
   const [texts, setTexts] = useState<StoredText[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const { toast } = useToast();
+  const [, navigate] = useLocation();
 
   useEffect(() => {
     loadTexts();
@@ -75,65 +97,96 @@ export function Dashboard({ user, subscriptionTier = "free" }: DashboardProps) {
     <div className="min-h-screen bg-background">
       <Header user={user} subscriptionTier={subscriptionTier} />
       
-      <main className="container mx-auto max-w-6xl px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">
-            Welcome back, {displayName}
+      <main className="container mx-auto max-w-7xl px-6 py-10">
+        <motion.div 
+          className="mb-10"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <h1 className="text-4xl font-bold mb-3">
+            Welcome back, <span className="gradient-text">{displayName}</span>
           </h1>
-          <p className="text-muted-foreground">
+          <p className="text-lg text-muted-foreground">
             Continue reading or add new texts to your library.
           </p>
-        </div>
+        </motion.div>
 
         {subscriptionTier === "free" && (
-          <Card className="mb-8 border-primary/20 bg-gradient-to-r from-primary/5 to-transparent">
-            <CardContent className="p-6">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-2 mb-2">
-                    <h3 className="font-semibold">Upgrade to Premium</h3>
-                    <SubscriptionBadge tier="premium" />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.2, duration: 0.5 }}
+          >
+            <Card className="mb-10 overflow-hidden border-0 gradient-border">
+              <div className="absolute inset-0 gradient-hero" />
+              <CardContent className="relative p-8">
+                <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+                  <div className="flex items-start gap-5">
+                    <motion.div 
+                      className="h-14 w-14 rounded-2xl gradient-primary flex items-center justify-center flex-shrink-0"
+                      whileHover={{ scale: 1.1, rotate: 5 }}
+                    >
+                      <Sparkles className="h-7 w-7 text-white" />
+                    </motion.div>
+                    <div>
+                      <h3 className="font-bold text-xl mb-2">Unlock Premium Features</h3>
+                      <p className="text-muted-foreground max-w-md">
+                        Read up to 1000 WPM, get advanced settings, and enjoy unlimited reading.
+                      </p>
+                    </div>
                   </div>
-                  <p className="text-sm text-muted-foreground">
-                    Unlock unlimited reading speed, advanced settings, and more features.
-                  </p>
+                  <Button 
+                    onClick={() => navigate("/settings")}
+                    className="rounded-full px-8 h-12 gradient-primary border-0 text-white glow-hover"
+                    data-testid="button-upgrade"
+                  >
+                    Upgrade to Premium
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
                 </div>
-                <Button variant="default" data-testid="button-upgrade">
-                  Upgrade Now
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </motion.div>
         )}
 
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-6">
+        <motion.div 
+          className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-8"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+        >
           <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
             <Input
               placeholder="Search your library..."
-              className="pl-10"
+              className="pl-12 h-12 rounded-2xl text-base"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               data-testid="input-search"
             />
           </div>
-          <Button onClick={() => setUploadDialogOpen(true)} data-testid="button-add-text">
-            <Plus className="h-4 w-4 mr-2" />
+          <Button 
+            onClick={() => setUploadDialogOpen(true)} 
+            className="rounded-full px-6 h-12 gradient-primary border-0 text-white"
+            data-testid="button-add-text"
+          >
+            <Plus className="h-5 w-5 mr-2" />
             Add Text
           </Button>
-        </div>
+        </motion.div>
 
         {isLoading ? (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[1, 2, 3].map((i) => (
-              <Card key={i} className="animate-pulse">
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="h-12 w-12 rounded-lg bg-muted" />
-                    <div className="flex-1 space-y-2">
-                      <div className="h-4 bg-muted rounded w-3/4" />
-                      <div className="h-3 bg-muted rounded w-1/2" />
-                      <div className="h-2 bg-muted rounded w-full mt-4" />
+              <Card key={i} className="animate-pulse rounded-3xl">
+                <CardContent className="p-6">
+                  <div className="flex items-start gap-4">
+                    <div className="h-14 w-14 rounded-2xl bg-muted" />
+                    <div className="flex-1 space-y-3">
+                      <div className="h-5 bg-muted rounded-full w-3/4" />
+                      <div className="h-4 bg-muted rounded-full w-1/2" />
+                      <div className="h-2 bg-muted rounded-full w-full mt-4" />
                     </div>
                   </div>
                 </CardContent>
@@ -141,41 +194,66 @@ export function Dashboard({ user, subscriptionTier = "free" }: DashboardProps) {
             ))}
           </div>
         ) : filteredTexts.length > 0 ? (
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredTexts.map((text) => (
-              <TextCard
-                key={text.id}
-                text={text}
-                onDelete={handleDeleteText}
-              />
+          <motion.div 
+            className="grid md:grid-cols-2 lg:grid-cols-3 gap-6"
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+          >
+            {filteredTexts.map((text, index) => (
+              <motion.div key={text.id} variants={itemVariants}>
+                <TextCard
+                  text={text}
+                  onDelete={handleDeleteText}
+                />
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         ) : texts.length === 0 ? (
-          <Card className="border-dashed">
-            <CardContent className="py-16 text-center">
-              <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
-                <Library className="h-8 w-8 text-muted-foreground" />
-              </div>
-              <h3 className="font-semibold text-lg mb-2">Your library is empty</h3>
-              <p className="text-muted-foreground mb-6 max-w-sm mx-auto">
-                Add your first text to start speed reading. Paste text or upload a .txt file.
-              </p>
-              <Button onClick={() => setUploadDialogOpen(true)} data-testid="button-add-first-text">
-                <Plus className="h-4 w-4 mr-2" />
-                Add Your First Text
-              </Button>
-            </CardContent>
-          </Card>
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5 }}
+          >
+            <Card className="border-dashed border-2 rounded-3xl overflow-hidden relative">
+              <FloatingElementsLight />
+              <CardContent className="py-20 text-center relative z-10">
+                <motion.div 
+                  className="h-20 w-20 rounded-3xl gradient-primary flex items-center justify-center mx-auto mb-6 glow-primary"
+                  whileHover={{ scale: 1.1, rotate: 5 }}
+                >
+                  <Library className="h-10 w-10 text-white" />
+                </motion.div>
+                <h3 className="font-bold text-2xl mb-3">Your library is empty</h3>
+                <p className="text-muted-foreground mb-8 max-w-sm mx-auto text-lg">
+                  Add your first text to start speed reading. Paste text or upload a .txt file.
+                </p>
+                <Button 
+                  onClick={() => setUploadDialogOpen(true)} 
+                  className="rounded-full px-8 h-12 gradient-primary border-0 text-white glow-hover"
+                  data-testid="button-add-first-text"
+                >
+                  <Plus className="h-5 w-5 mr-2" />
+                  Add Your First Text
+                </Button>
+              </CardContent>
+            </Card>
+          </motion.div>
         ) : (
-          <Card className="border-dashed">
-            <CardContent className="py-12 text-center">
-              <Search className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
-              <h3 className="font-semibold mb-2">No results found</h3>
-              <p className="text-muted-foreground text-sm">
-                No texts match your search. Try a different query.
-              </p>
-            </CardContent>
-          </Card>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+          >
+            <Card className="border-dashed border-2 rounded-3xl">
+              <CardContent className="py-16 text-center">
+                <Search className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="font-bold text-xl mb-2">No results found</h3>
+                <p className="text-muted-foreground">
+                  No texts match your search. Try a different query.
+                </p>
+              </CardContent>
+            </Card>
+          </motion.div>
         )}
       </main>
 
