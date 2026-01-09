@@ -354,11 +354,13 @@ export async function registerRoutes(
 
         if (args.length > 1) {
           const token = args[1];
+          console.log("Processing /start with token, chatId:", chatId, "telegramUserId:", telegramUserId);
 
           // Verify token
           try {
             const decoded = Buffer.from(token, "base64url").toString();
             const [userId, timestamp, hash] = decoded.split(":");
+            console.log("Token decoded - userId:", userId, "tokenAge:", Date.now() - parseInt(timestamp, 10), "ms");
 
             // Check token age (valid for 1 hour)
             const tokenAge = Date.now() - parseInt(timestamp, 10);
@@ -615,8 +617,9 @@ async function sendPaymentInvoice(
   userId: string,
 ) {
   const starsPrice = parseInt(process.env.TELEGRAM_STARS_PRICE || "100", 10);
+  console.log("Sending payment invoice to chatId:", chatId, "price:", starsPrice, "Stars");
 
-  await fetch(`https://api.telegram.org/bot${botToken}/sendInvoice`, {
+  const response = await fetch(`https://api.telegram.org/bot${botToken}/sendInvoice`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -634,4 +637,11 @@ async function sendPaymentInvoice(
       provider_token: "",
     }),
   });
+  
+  const result = await response.json();
+  console.log("sendInvoice response:", JSON.stringify(result));
+  
+  if (!result.ok) {
+    console.error("Failed to send invoice:", result.description);
+  }
 }
