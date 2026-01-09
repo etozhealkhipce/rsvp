@@ -35,7 +35,7 @@ const passwordFormSchema = z.object({
 type EmailFormData = z.infer<typeof emailSchema>;
 type PasswordFormData = { currentPassword: string; newPassword: string };
 
-const TELEGRAM_BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME || "RSVPReaderBot";
+const TELEGRAM_BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME || "default";
 
 export function SettingsPage() {
   const [, navigate] = useLocation();
