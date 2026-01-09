@@ -576,7 +576,7 @@ async function sendPaymentInvoice(
   telegramUserId: string,
   userId: string,
 ) {
-  const starsPrice = parseInt(process.env.TELEGRAM_STARS_PRICE || "100", 10);
+  const starsPrice = parseInt(process.env.TELEGRAM_STARS_PRICE || "1", 10);
   console.log(
     "Sending payment invoice to chatId:",
     chatId,
