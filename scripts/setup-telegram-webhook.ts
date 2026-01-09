@@ -1,4 +1,3 @@
-import "dotenv/config";
 import * as crypto from "crypto";
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
