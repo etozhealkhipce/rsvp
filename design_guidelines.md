@@ -2,120 +2,211 @@
 
 ## Design Approach
 
-**System**: Custom minimal design system inspired by **Linear** (typography/spacing) + **Pocket** (reading focus) + **Notion** (content organization)
+**Reference**: Custom system inspired by **joinpogo.com** (playful aesthetics/animations) + **Duolingo** (gamified engagement) + **Linear** (typography clarity)
 
-**Rationale**: Utility-first application requiring distraction-free reading experience with clear information hierarchy for library management and subscription features.
+**Rationale**: Transform utility-focused reading app into engaging, memorable experience through playful visual language while maintaining reading clarity during RSVP sessions.
 
 ## Core Design Principles
 
-1. **Reading-First**: Minimize visual noise during RSVP sessions
-2. **Clarity**: Instant comprehension of subscription status and controls
-3. **Performance Feel**: Fast, responsive interactions matching app's speed-reading purpose
+1. **Playful Engagement**: Vibrant, fun interface that makes speed reading feel exciting
+2. **Visual Interest**: Floating decorative elements create depth and movement
+3. **Reading Sanctity**: RSVP display remains distraction-free despite playful surrounding UI
+4. **Micro-Delight**: Smooth animations and hover effects reward interaction
 
 ## Typography
 
 **Font Families** (via Google Fonts CDN):
-- Primary: Inter (UI, controls, navigation) - weights 400, 500, 600
-- Reading Display: JetBrains Mono (for RSVP word display) - weight 700
-- Fallback system fonts for performance
+- Primary UI: Inter - weights 400, 500, 600, 700, 800
+- RSVP Display: JetBrains Mono - weight 700
+- Decorative Headlines: Inter Extra Bold (800) with tight letter-spacing
 
-**Scale**:
-- RSVP Display: text-6xl to text-8xl (adjustable)
-- Page Headers: text-3xl (semibold)
-- Section Headers: text-xl (medium)
-- Body/Controls: text-base
-- Metadata/Labels: text-sm (medium)
+**Scale & Treatment**:
+- Hero Headlines: text-5xl to text-7xl, font-extrabold, gradient text effect
+- RSVP Display: text-6xl to text-9xl (user-adjustable)
+- Section Headers: text-3xl to text-4xl, font-bold
+- Card Titles: text-xl, font-semibold
+- Body/Controls: text-base to text-lg
+- Micro-copy: text-sm, font-medium
 
 ## Layout System
 
-**Spacing Primitives**: Tailwind units of **2, 4, 8, 12, 16**
-- Tight spacing: gap-2, p-2 (control groups)
-- Standard spacing: gap-4, p-4 (cards, buttons)
-- Section spacing: gap-8, p-8 (content areas)
-- Page margins: p-12 or p-16 (main containers)
+**Spacing Primitives**: Tailwind units of **3, 4, 6, 8, 12, 16, 20, 24**
+- Compact spacing: gap-3, p-3 (tight button groups)
+- Standard spacing: gap-6, p-6 (cards, containers)
+- Generous spacing: gap-12, p-12 (sections)
+- Hero spacing: py-20 to py-32 (landing areas)
 
-**Grid Strategy**:
-- Dashboard Library: 3-column grid (lg:grid-cols-3 md:grid-cols-2 grid-cols-1)
-- Reading Interface: Single-column centered (max-w-4xl)
-- Settings Panel: 2-column form layout (lg:grid-cols-2)
+**Container Strategy**:
+- Marketing sections: max-w-7xl with generous padding
+- Reading interface: max-w-3xl centered, min-h-screen
+- Dashboard grid: 3-column (lg:grid-cols-3 md:grid-cols-2)
 
 ## Component Library
 
+### Landing Page (Marketing)
+
+**Hero Section**:
+- Full viewport height (min-h-screen) with gradient background
+- Large hero image: Illustration of person speed reading with floating book elements, positioned right side (60% width on desktop)
+- Left content: Massive headline (text-6xl font-extrabold), subheadline, primary CTA button with gradient
+- Floating decorative elements: 5-7 abstract book shapes, letter characters, speed meter icons positioned absolutely with subtle float animations
+- Hero CTA buttons: Backdrop blur background (backdrop-blur-md), rounded-full (pill shape)
+
+**Features Section** (3-column grid):
+- Feature cards: Highly rounded corners (rounded-3xl), generous padding (p-8)
+- Each card: Large icon (w-16 h-16) with gradient background, bold title, description
+- Decorative accent: Small floating element (book/letter) per card with rotation animation
+- Hover effect: Lift transform with shadow increase
+
+**How It Works** (4 steps, horizontal timeline on desktop):
+- Step cards: Connected with animated dotted lines
+- Circular step numbers with gradient fills
+- Icon + title + description per step
+- Stagger-reveal animation on scroll
+
+**Testimonials Section**:
+- 2-column grid alternating layout
+- Bubbly speech-bubble style cards (rounded-2xl with small tail)
+- User avatar, quote, name/occupation
+- Floating quotation mark decorative element
+
+**CTA Section**:
+- Centered content with gradient background
+- Oversized button (h-16, px-12, rounded-full)
+- Supporting text with feature highlights (3 inline pills)
+
 ### Navigation
-- **Top Bar**: Fixed header with logo, library link, account dropdown, subscription badge
-- Height: h-16
-- Account dropdown shows tier status (Free/Premium) with visual indicator
+
+**Top Bar**:
+- Fixed header (h-20), backdrop blur effect
+- Logo with playful icon (bouncing book animation on page load)
+- Navigation links with pill-shaped hover backgrounds
+- Account dropdown: Rounded-2xl, includes tier badge with gradient
+- Mobile: Hamburger with full-screen overlay menu
 
 ### Dashboard
-- **Book Cards**: Rounded corners (rounded-lg), subtle shadow, hover lift effect
-- Card content: Cover placeholder (if available), title (font-semibold), progress bar, last read timestamp, quick actions
-- Empty state: Centered illustration placeholder with upload CTA
+
+**Library Grid**:
+- Book cards: Rounded-2xl, gradient border effect
+- Card hover: Pronounced lift (translate-y-[-8px]), glow effect
+- Content layout: Book cover thumbnail (rounded-xl), title, progress ring (circular, animated), quick actions
+- Empty state: Large illustration with floating book elements, rounded-2xl upload zone with dashed gradient border
+
+**Stats Bar** (above library):
+- Horizontal pills showing: Books read, Total time, Avg WPM
+- Each pill: Rounded-full, icon + number + label
+- Animated counter on page load
 
 ### Reading Interface
-- **RSVP Display Area**:
-  - Centered container: max-w-2xl, min-h-screen flex items-center
-  - Word display: Massive text (responsive 4xl-8xl), monospace font
-  - ORP marker: Red vertical line (w-0.5 bg-red-500) positioned at calculated focal point
-  - Background: Minimal, zero distractions
 
-- **Control Panel** (Bottom fixed):
-  - Translucent background (backdrop-blur-md)
-  - Layout: Centered flex with gap-4
-  - Play/Pause: Large circular button (w-16 h-16)
-  - WPM Display: Prominent badge showing current speed
-  - Progress: Thin horizontal bar spanning width
-  - Settings icon: Opens speed/font controls in slide-up modal
+**RSVP Display**:
+- Centered container (max-w-3xl)
+- Word display: Massive JetBrains Mono, neutral background for clarity
+- ORP marker: Bold vertical accent line
+- Minimal decorative elements: Subtle corner flourishes only (no floating elements during reading)
 
-### Forms & Inputs
-- **File Upload**: Drag-and-drop zone with dashed border (border-2 border-dashed), rounded-xl, p-8
-- Accepted formats badge: Small pill showing ".pdf, .txt"
-- **Text Paste Area**: Full-width textarea, rounded-lg, min-h-48
+**Control Panel** (Fixed bottom):
+- Wide rounded container (rounded-t-3xl), backdrop blur
+- Layout: Flex with gap-6, centered
+- Play/Pause: Large circular button (w-20 h-20, rounded-full) with icon morph animation
+- WPM Badge: Pill-shaped, large text, gradient background
+- Progress bar: Full-width, rounded-full, gradient fill with animated pulse at playhead
+- Speed controls: Slide-up modal with oversized rounded slider, live preview
 
 ### Subscription
-- **Tier Badge**: Pill-shaped, positioned in header
-  - Free: Muted styling
-  - Premium: Gradient background with icon
-- **Upgrade CTA**: Prominent card in dashboard if Free tier, showing feature comparison table (2-column: Free vs Premium)
 
-### Settings Modal
-- **Speed Controls**: Large slider with WPM labels at intervals
-- **Gradual Start Toggle**: Switch component with explanation text
-- **Font Size**: Slider with live preview
-- Typography: Clean labels (text-sm font-medium), descriptions (text-sm text-gray-600)
+**Tier Comparison Table** (Dashboard if Free):
+- 2-column card (rounded-3xl)
+- Free vs Premium with checkmark/x icons
+- Premium column: Gradient background
+- Upgrade button: Prominent, rounded-full, gradient with animated shimmer effect
+
+**Premium Badge** (Header):
+- Gradient pill with sparkle icon
+- Subtle pulse animation
+
+### Forms & Inputs
+
+**Upload Zone**:
+- Large rounded-3xl container with gradient dashed border
+- Drag-drop area with animated border on hover/drag
+- File icon that animates on file selection
+- Supported formats as colorful pills below
+
+**Text Input**:
+- Rounded-2xl with generous padding (p-4)
+- Floating label animation
+- Focus state: Gradient border appearance
 
 ### Authentication
-- **Login/Signup**: Centered card (max-w-md), rounded-2xl, p-8
-- Google Auth button: Full-width with icon, outlined style
-- Email/password fields: Rounded inputs with floating labels
 
-## Accessibility
-- Focus states: 2px outline offset on all interactive elements
-- Keyboard navigation: Tab through controls, Space/Enter for actions
-- Screen reader: ARIA labels for RSVP state, progress percentage
-- Consistent 44px minimum touch targets for mobile
+**Login/Signup Card**:
+- Centered (max-w-lg), rounded-3xl, p-12
+- Decorative floating elements in background
+- Google button: Rounded-full, icon + text
+- Input fields: Rounded-xl with smooth focus transitions
 
-## Animations
-**Minimal, purposeful only**:
-- Card hover: Subtle translate-y lift (2-4px)
-- RSVP word transitions: Instant (no fade), only pause duration changes
-- Control panel: Slide-up/down (duration-300)
-- Loading states: Simple spinner, no skeleton screens
+## Decorative Elements Strategy
+
+**Floating Elements**:
+- Books: 3D-rotated rectangles, varied sizes (w-12 to w-24)
+- Letters: Bold single characters, oversized, semi-transparent
+- Speed indicators: Gauge/meter icons, speedometer graphics
+- Positioning: Absolute, scattered across hero and section backgrounds
+- Animation: Subtle float (translate-y), slow rotation, parallax on scroll
+
+**Placement**:
+- Hero: 7-10 elements, larger sizes
+- Feature sections: 2-3 elements per section, smaller
+- Reading interface: None (maintain focus)
+- Dashboard: 3-4 subtle elements in header area only
+
+## Animations & Micro-Interactions
+
+**Page Load**:
+- Logo bounce (duration-500)
+- Hero elements stagger-fade-in (delay increments)
+- Stats counter animation (number count-up effect)
+
+**Hover States**:
+- Cards: Lift + glow (duration-200)
+- Buttons: Scale slight grow (scale-105) + shadow increase
+- Navigation links: Pill background slide-in
+
+**Active Reading**:
+- RSVP word: Instant transition (no animation during reading)
+- Progress bar: Smooth fill animation
+- WPM change: Number morph effect
+
+**Scroll-Triggered**:
+- Feature cards: Stagger reveal (intersection observer)
+- Decorative elements: Parallax movement (subtle depth)
+- Timeline steps: Progressive appearance
 
 ## Images
 
-**No hero image** - This is a utility application focused on reading functionality.
+**Hero Section**: Large illustration/photo showing speed reading in action - person with floating books/text elements around them, positioned on right 50-60% of viewport. Modern, vibrant, slightly stylized illustration style.
 
-**Icon Library**: Heroicons (outline style) via CDN
-- Navigation, controls, file types, settings icons
+**Feature Icons**: Use Heroicons via CDN, placed in gradient circular containers (w-16 h-16)
 
-**Placeholders**:
-- Book covers: Generic document icon or user-uploaded thumbnails (aspect-ratio-3/4)
-- Empty states: Simple SVG illustrations (upload, empty library)
+**Book Covers**: User-uploaded thumbnails or placeholder gradient rectangles (aspect-ratio-2/3, rounded-xl)
+
+**Decorative Illustrations**: Abstract book shapes, oversized letters, speed gauge graphics - simple SVG shapes with gradient fills, positioned absolutely throughout marketing pages
+
+## Accessibility
+
+- Focus indicators: Thick outline (3px) with offset on all interactive elements
+- Reduced motion: Respect prefers-reduced-motion to disable decorative animations
+- ARIA labels: All decorative elements marked aria-hidden="true"
+- Reading interface: Maximum contrast, zero motion during RSVP display
+- Touch targets: Minimum 48px for all interactive elements
+- Keyboard navigation: Full support with visible focus states
 
 ## Visual Hierarchy
 
-1. RSVP word during reading session (dominates viewport)
-2. Control panel actions (fixed, accessible)
-3. Library organization (cards with clear metadata)
-4. Subscription status (persistent but non-intrusive)
-5. Settings/account (secondary, accessible via dropdown)
+1. **RSVP word display** (dominant during reading, neutral background)
+2. **Hero headline & CTA** (landing page entry point)
+3. **Primary action buttons** (gradient, oversized)
+4. **Feature cards & content sections** (structured hierarchy)
+5. **Decorative elements** (background layer, lower opacity)
+6. **Secondary actions & metadata** (subtle, accessible)
