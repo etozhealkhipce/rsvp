@@ -44,6 +44,7 @@ export function ReaderPage() {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const rampUpRef = useRef<NodeJS.Timeout | null>(null);
   const settingsInitialized = useRef(false);
+  const currentWpmRef = useRef(settings.wpm);
 
   const { data: preferences } = useQuery<UserPreferences | null>({
     queryKey: ["/api/preferences"],
@@ -161,40 +162,49 @@ export function ReaderPage() {
     return baseDelay;
   }, [settings.pauseOnPunctuation]);
 
-  const scheduleNextWord = useCallback(() => {
-    if (currentIndex >= words.length - 1) {
-      setIsPlaying(false);
-      toast({
-        title: "Finished!",
-        description: "You've completed reading this text.",
-      });
+  useEffect(() => {
+    currentWpmRef.current = currentWpm;
+  }, [currentWpm]);
+
+  useEffect(() => {
+    if (!isPlaying || words.length === 0) {
       return;
     }
 
-    const delay = getDelayForWord(words[currentIndex], currentWpm);
-    
-    intervalRef.current = setTimeout(() => {
-      setCurrentIndex(prev => {
-        const newIndex = prev + 1;
-        if (text) {
-          updateProgress(text.id, newIndex);
-        }
-        return newIndex;
-      });
-    }, delay);
-  }, [currentIndex, words, currentWpm, getDelayForWord, text, toast]);
+    const scheduleNext = () => {
+      if (intervalRef.current) {
+        clearTimeout(intervalRef.current);
+      }
 
-  useEffect(() => {
-    if (isPlaying && words.length > 0) {
-      scheduleNextWord();
-    }
+      const delay = getDelayForWord(words[currentIndex], currentWpmRef.current);
+      
+      intervalRef.current = setTimeout(() => {
+        setCurrentIndex(prev => {
+          const newIndex = prev + 1;
+          if (newIndex >= words.length) {
+            setIsPlaying(false);
+            toast({
+              title: "Finished!",
+              description: "You've completed reading this text.",
+            });
+            return prev;
+          }
+          if (text) {
+            updateProgress(text.id, newIndex);
+          }
+          return newIndex;
+        });
+      }, delay);
+    };
+
+    scheduleNext();
     
     return () => {
       if (intervalRef.current) {
         clearTimeout(intervalRef.current);
       }
     };
-  }, [isPlaying, currentIndex, scheduleNextWord, words.length]);
+  }, [isPlaying, currentIndex, words, text, toast, getDelayForWord]);
 
   useEffect(() => {
     if (isPlaying && settings.gradualStart && startTime) {
@@ -231,9 +241,12 @@ export function ReaderPage() {
     if (!isPlaying) {
       if (settings.gradualStart) {
         setStartTime(Date.now());
-        setCurrentWpm(Math.round(settings.wpm * 0.6));
+        const startWpm = Math.round(settings.wpm * 0.6);
+        setCurrentWpm(startWpm);
+        currentWpmRef.current = startWpm;
       } else {
         setCurrentWpm(settings.wpm);
+        currentWpmRef.current = settings.wpm;
       }
     } else {
       if (intervalRef.current) {
@@ -250,7 +263,9 @@ export function ReaderPage() {
     setIsPlaying(false);
     setCurrentIndex(0);
     setStartTime(null);
-    setCurrentWpm(settings.gradualStart ? Math.round(settings.wpm * 0.6) : settings.wpm);
+    const resetWpm = settings.gradualStart ? Math.round(settings.wpm * 0.6) : settings.wpm;
+    setCurrentWpm(resetWpm);
+    currentWpmRef.current = resetWpm;
     if (intervalRef.current) {
       clearTimeout(intervalRef.current);
     }
@@ -282,6 +297,7 @@ export function ReaderPage() {
     setSettings(newSettings);
     if (!settings.gradualStart || !isPlaying) {
       setCurrentWpm(newSettings.wpm);
+      currentWpmRef.current = newSettings.wpm;
     }
 
     if (text) {
