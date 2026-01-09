@@ -303,10 +303,7 @@ export async function registerRoutes(
       const update = req.body;
       const botToken = process.env.TELEGRAM_BOT_TOKEN;
       const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
-      const starsPrice = parseInt(
-        process.env.TELEGRAM_STARS_PRICE || "100",
-        10,
-      );
+      const starsPrice = parseInt(process.env.TELEGRAM_STARS_PRICE || "1", 10);
 
       if (!botToken) {
         console.error("TELEGRAM_BOT_TOKEN not configured");
@@ -314,14 +311,21 @@ export async function registerRoutes(
       }
 
       // Log incoming webhook for debugging
-      console.log("Telegram webhook received:", JSON.stringify(update).substring(0, 200));
-      
+      console.log(
+        "Telegram webhook received:",
+        JSON.stringify(update).substring(0, 200),
+      );
+
       // Verify webhook authenticity using Telegram's secret_token header
       // Note: Some proxies/CDNs may strip the header, so we log but don't reject
       if (webhookSecret) {
         const receivedSecret = req.headers["x-telegram-bot-api-secret-token"];
         if (receivedSecret !== webhookSecret) {
-          console.warn("Telegram webhook: Secret token mismatch or missing (header:", receivedSecret ? "present" : "missing", ")");
+          console.warn(
+            "Telegram webhook: Secret token mismatch or missing (header:",
+            receivedSecret ? "present" : "missing",
+            ")",
+          );
           // Continue processing - Telegram's IP verification provides baseline security
         }
       }
@@ -334,11 +338,18 @@ export async function registerRoutes(
 
         if (args.length > 1) {
           const tokenId = args[1];
-          console.log("Processing /start with token:", tokenId, "chatId:", chatId, "telegramUserId:", telegramUserId);
+          console.log(
+            "Processing /start with token:",
+            tokenId,
+            "chatId:",
+            chatId,
+            "telegramUserId:",
+            telegramUserId,
+          );
 
           // Look up token in database
           const linkToken = await storage.getTelegramLinkToken(tokenId);
-          
+
           if (!linkToken) {
             await sendTelegramMessage(
               botToken,
@@ -355,7 +366,8 @@ export async function registerRoutes(
           await storage.deleteTelegramLinkToken(tokenId);
 
           // Check if Telegram ID is already linked to another account
-          const existingSub = await storage.getSubscriptionByTelegramId(telegramUserId);
+          const existingSub =
+            await storage.getSubscriptionByTelegramId(telegramUserId);
           if (existingSub && existingSub.userId !== userId) {
             await sendTelegramMessage(
               botToken,
@@ -393,12 +405,7 @@ export async function registerRoutes(
               "Your account is already Premium! Return to the app to continue reading.",
             );
           } else {
-            await sendPaymentInvoice(
-              botToken,
-              chatId,
-              telegramUserId,
-              userId,
-            );
+            await sendPaymentInvoice(botToken, chatId, telegramUserId, userId);
           }
         } else {
           await sendTelegramMessage(
@@ -570,30 +577,39 @@ async function sendPaymentInvoice(
   userId: string,
 ) {
   const starsPrice = parseInt(process.env.TELEGRAM_STARS_PRICE || "100", 10);
-  console.log("Sending payment invoice to chatId:", chatId, "price:", starsPrice, "Stars");
+  console.log(
+    "Sending payment invoice to chatId:",
+    chatId,
+    "price:",
+    starsPrice,
+    "Stars",
+  );
 
-  const response = await fetch(`https://api.telegram.org/bot${botToken}/sendInvoice`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      title: "RSVP Reader Premium",
-      description:
-        "Unlock reading speeds up to 1000 WPM and all premium features",
-      payload: JSON.stringify({
-        telegramUserId,
-        userId,
-        timestamp: Date.now(),
+  const response = await fetch(
+    `https://api.telegram.org/bot${botToken}/sendInvoice`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        title: "RSVP Reader Premium",
+        description:
+          "Unlock reading speeds up to 1000 WPM and all premium features",
+        payload: JSON.stringify({
+          telegramUserId,
+          userId,
+          timestamp: Date.now(),
+        }),
+        currency: "XTR",
+        prices: [{ label: "Premium", amount: starsPrice }],
+        provider_token: "",
       }),
-      currency: "XTR",
-      prices: [{ label: "Premium", amount: starsPrice }],
-      provider_token: "",
-    }),
-  });
-  
+    },
+  );
+
   const result = await response.json();
   console.log("sendInvoice response:", JSON.stringify(result));
-  
+
   if (!result.ok) {
     console.error("Failed to send invoice:", result.description);
   }
