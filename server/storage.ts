@@ -1,38 +1,71 @@
-import { type User, type InsertUser } from "@shared/schema";
-import { randomUUID } from "crypto";
-
-// modify the interface with any CRUD methods
-// you might need
+import { 
+  subscriptions, 
+  userPreferences,
+  type Subscription, 
+  type InsertSubscription,
+  type UserPreferences,
+  type InsertUserPreferences
+} from "@shared/schema";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 
 export interface IStorage {
-  getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
+  getSubscription(userId: string): Promise<Subscription | undefined>;
+  createOrUpdateSubscription(subscription: InsertSubscription): Promise<Subscription>;
+  getUserPreferences(userId: string): Promise<UserPreferences | undefined>;
+  createOrUpdateUserPreferences(preferences: InsertUserPreferences): Promise<UserPreferences>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<string, User>;
-
-  constructor() {
-    this.users = new Map();
+export class DatabaseStorage implements IStorage {
+  async getSubscription(userId: string): Promise<Subscription | undefined> {
+    const [subscription] = await db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.userId, userId));
+    return subscription;
   }
 
-  async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+  async createOrUpdateSubscription(subscriptionData: InsertSubscription): Promise<Subscription> {
+    const [subscription] = await db
+      .insert(subscriptions)
+      .values(subscriptionData)
+      .onConflictDoUpdate({
+        target: subscriptions.userId,
+        set: {
+          tier: subscriptionData.tier,
+          maxWpm: subscriptionData.maxWpm,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return subscription;
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+  async getUserPreferences(userId: string): Promise<UserPreferences | undefined> {
+    const [prefs] = await db
+      .select()
+      .from(userPreferences)
+      .where(eq(userPreferences.userId, userId));
+    return prefs;
   }
 
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
-    return user;
+  async createOrUpdateUserPreferences(prefsData: InsertUserPreferences): Promise<UserPreferences> {
+    const [prefs] = await db
+      .insert(userPreferences)
+      .values(prefsData)
+      .onConflictDoUpdate({
+        target: userPreferences.userId,
+        set: {
+          defaultWpm: prefsData.defaultWpm,
+          gradualStart: prefsData.gradualStart,
+          pauseOnPunctuation: prefsData.pauseOnPunctuation,
+          fontSize: prefsData.fontSize,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return prefs;
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();
