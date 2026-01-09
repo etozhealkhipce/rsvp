@@ -1,3 +1,4 @@
+import { useLocation } from "wouter";
 import { BookOpen, Zap, Brain, Clock, ArrowRight, Eye, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -28,6 +29,8 @@ const stats = [
 ];
 
 export function LandingPage() {
+  const [, navigate] = useLocation();
+
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -40,8 +43,8 @@ export function LandingPage() {
           </div>
           <div className="flex items-center gap-2">
             <ThemeToggle />
-            <Button asChild data-testid="button-login-header">
-              <a href="/api/login">Sign in</a>
+            <Button onClick={() => navigate("/login")} data-testid="button-login-header">
+              Sign in
             </Button>
           </div>
         </div>
@@ -70,11 +73,9 @@ export function LandingPage() {
               </p>
               
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12">
-                <Button size="lg" asChild className="min-w-[200px]" data-testid="button-get-started">
-                  <a href="/api/login">
-                    Get Started Free
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </a>
+                <Button size="lg" onClick={() => navigate("/register")} className="min-w-[200px]" data-testid="button-get-started">
+                  Get Started Free
+                  <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
                 <Button size="lg" variant="outline" asChild className="min-w-[200px]" data-testid="button-learn-more">
                   <a href="#features">Learn More</a>
@@ -140,11 +141,9 @@ export function LandingPage() {
                   Join thousands of readers who have dramatically improved their reading speed. 
                   Start your journey today.
                 </p>
-                <Button size="lg" asChild data-testid="button-start-reading">
-                  <a href="/api/login">
-                    Start Reading Now
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </a>
+                <Button size="lg" onClick={() => navigate("/register")} data-testid="button-start-reading">
+                  Start Reading Now
+                  <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </CardContent>
             </Card>

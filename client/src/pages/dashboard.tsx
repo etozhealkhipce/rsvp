@@ -9,10 +9,11 @@ import { TextCard } from "@/components/text-card";
 import { SubscriptionBadge } from "@/components/subscription-badge";
 import { getAllTexts, deleteText, type StoredText } from "@/lib/indexeddb";
 import { useToast } from "@/hooks/use-toast";
-import type { User } from "@shared/models/auth";
+
+import type { AuthUser } from "@shared/types/auth";
 
 interface DashboardProps {
-  user: User;
+  user: AuthUser;
   subscriptionTier?: "free" | "premium";
 }
 

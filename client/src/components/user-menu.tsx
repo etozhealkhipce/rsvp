@@ -1,4 +1,5 @@
-import { LogOut, User as UserIcon, Settings } from "lucide-react";
+import { LogOut, Settings } from "lucide-react";
+import { useLocation } from "wouter";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,16 +11,26 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { SubscriptionBadge } from "./subscription-badge";
-import type { User } from "@shared/models/auth";
+import { useAuth } from "@/hooks/use-auth";
+
+import type { AuthUser } from "@shared/types/auth";
 
 interface UserMenuProps {
-  user: User;
+  user: AuthUser;
   subscriptionTier?: "free" | "premium";
 }
 
 export function UserMenu({ user, subscriptionTier = "free" }: UserMenuProps) {
-  const initials = `${user.firstName?.[0] || ""}${user.lastName?.[0] || ""}`.toUpperCase() || "U";
+  const [, navigate] = useLocation();
+  const { logout, isLoggingOut } = useAuth();
+  
+  const initials = `${user.firstName?.[0] || ""}${user.lastName?.[0] || ""}`.toUpperCase() || user.email?.[0]?.toUpperCase() || "U";
   const displayName = [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email || "User";
+
+  const handleLogout = () => {
+    logout();
+    navigate("/");
+  };
 
   return (
     <DropdownMenu>
@@ -48,18 +59,19 @@ export function UserMenu({ user, subscriptionTier = "free" }: UserMenuProps) {
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <a href="/settings" className="cursor-pointer" data-testid="link-settings">
-            <Settings className="mr-2 h-4 w-4" />
-            Settings
-          </a>
+        <DropdownMenuItem onClick={() => navigate("/settings")} className="cursor-pointer" data-testid="link-settings">
+          <Settings className="mr-2 h-4 w-4" />
+          Settings
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <a href="/api/logout" className="cursor-pointer text-destructive" data-testid="link-logout">
-            <LogOut className="mr-2 h-4 w-4" />
-            Sign out
-          </a>
+        <DropdownMenuItem 
+          onClick={handleLogout} 
+          className="cursor-pointer text-destructive focus:text-destructive" 
+          disabled={isLoggingOut}
+          data-testid="link-logout"
+        >
+          <LogOut className="mr-2 h-4 w-4" />
+          {isLoggingOut ? "Signing out..." : "Sign out"}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

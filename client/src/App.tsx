@@ -8,6 +8,8 @@ import { useAuth } from "@/hooks/use-auth";
 import { LandingPage } from "@/pages/landing";
 import { Dashboard } from "@/pages/dashboard";
 import { ReaderPage } from "@/pages/reader";
+import { LoginPage, RegisterPage } from "@/pages/auth";
+import { SettingsPage } from "@/pages/settings";
 import NotFound from "@/pages/not-found";
 import type { Subscription } from "@shared/schema";
 
@@ -51,8 +53,17 @@ function AppContent() {
       <Route path="/">
         {user ? <Dashboard user={user} subscriptionTier={subscriptionTier} /> : <LandingPage />}
       </Route>
+      <Route path="/login">
+        {user ? <Dashboard user={user} subscriptionTier={subscriptionTier} /> : <LoginPage />}
+      </Route>
+      <Route path="/register">
+        {user ? <Dashboard user={user} subscriptionTier={subscriptionTier} /> : <RegisterPage />}
+      </Route>
+      <Route path="/settings">
+        {user ? <SettingsPage /> : <LoginPage />}
+      </Route>
       <Route path="/read/:id">
-        {user ? <ReaderPage /> : <LandingPage />}
+        {user ? <ReaderPage /> : <LoginPage />}
       </Route>
       <Route component={NotFound} />
     </Switch>

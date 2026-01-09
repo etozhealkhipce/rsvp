@@ -1,12 +1,13 @@
-import { BookOpen, Library } from "lucide-react";
+import { BookOpen, Library, Settings } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { ThemeToggle } from "./theme-toggle";
 import { UserMenu } from "./user-menu";
 import { Button } from "@/components/ui/button";
-import type { User } from "@shared/models/auth";
+
+import type { AuthUser } from "@shared/types/auth";
 
 interface HeaderProps {
-  user?: User | null;
+  user?: AuthUser | null;
   subscriptionTier?: "free" | "premium";
 }
 
@@ -49,7 +50,7 @@ export function Header({ user, subscriptionTier = "free" }: HeaderProps) {
             <UserMenu user={user} subscriptionTier={subscriptionTier} />
           ) : (
             <Button asChild data-testid="button-login">
-              <a href="/api/login">Sign in</a>
+              <Link href="/login">Sign in</Link>
             </Button>
           )}
         </div>

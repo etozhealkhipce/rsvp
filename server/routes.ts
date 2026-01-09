@@ -1,19 +1,55 @@
-import type { Express } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
-import { setupAuth, registerAuthRoutes, isAuthenticated } from "./replit_integrations/auth";
+import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
+import { setupAuthRoutes, requireAuth, findUserById, findUserByEmail } from "./auth";
 import { storage } from "./storage";
-import { insertSubscriptionSchema, insertUserPreferencesSchema } from "@shared/schema";
+import { insertSubscriptionSchema, insertUserPreferencesSchema, users } from "@shared/schema";
+import { updateEmailSchema, updatePasswordSchema } from "@shared/types/auth";
+import { pool, db } from "./db";
+import bcrypt from "bcrypt";
+import { eq } from "drizzle-orm";
+
+declare module "express-session" {
+  interface SessionData {
+    userId?: string;
+  }
+}
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  await setupAuth(app);
-  registerAuthRoutes(app);
+  const PostgresStore = connectPgSimple(session);
 
-  app.get("/api/subscription", isAuthenticated, async (req: any, res) => {
+  const sessionSecret = process.env.SESSION_SECRET;
+  if (!sessionSecret) {
+    throw new Error("SESSION_SECRET environment variable is required");
+  }
+
+  app.use(
+    session({
+      store: new PostgresStore({
+        pool,
+        createTableIfMissing: true,
+      }),
+      secret: sessionSecret,
+      resave: false,
+      saveUninitialized: false,
+      cookie: {
+        secure: process.env.NODE_ENV === "production",
+        httpOnly: true,
+        maxAge: 30 * 24 * 60 * 60 * 1000,
+      },
+    })
+  );
+
+  const authRouter = setupAuthRoutes();
+  app.use("/api/auth", authRouter);
+
+  app.get("/api/subscription", requireAuth, async (req: Request, res: Response) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.session.userId!;
       let subscription = await storage.getSubscription(userId);
       
       if (!subscription) {
@@ -31,9 +67,9 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/subscription", isAuthenticated, async (req: any, res) => {
+  app.post("/api/subscription", requireAuth, async (req: Request, res: Response) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.session.userId!;
       const parsed = insertSubscriptionSchema.safeParse({ ...req.body, userId });
       
       if (!parsed.success) {
@@ -48,9 +84,9 @@ export async function registerRoutes(
     }
   });
 
-  app.get("/api/preferences", isAuthenticated, async (req: any, res) => {
+  app.get("/api/preferences", requireAuth, async (req: Request, res: Response) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.session.userId!;
       let preferences = await storage.getUserPreferences(userId);
       
       if (!preferences) {
@@ -70,9 +106,9 @@ export async function registerRoutes(
     }
   });
 
-  app.patch("/api/preferences", isAuthenticated, async (req: any, res) => {
+  app.patch("/api/preferences", requireAuth, async (req: Request, res: Response) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.session.userId!;
       const currentPrefs = await storage.getUserPreferences(userId);
       
       const updatedData = {
@@ -94,6 +130,91 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error updating preferences:", error);
       res.status(500).json({ message: "Failed to update preferences" });
+    }
+  });
+
+  app.patch("/api/account/email", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId!;
+      
+      const parsed = updateEmailSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ 
+          message: "Validation failed", 
+          errors: parsed.error.flatten().fieldErrors 
+        });
+      }
+
+      const { newEmail, password } = parsed.data;
+
+      const existingUser = await findUserByEmail(newEmail);
+      if (existingUser && existingUser.id !== userId) {
+        return res.status(400).json({ message: "Email already registered" });
+      }
+
+      const user = await findUserById(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const isValid = await bcrypt.compare(password, user.passwordHash);
+      if (!isValid) {
+        return res.status(401).json({ message: "Invalid password" });
+      }
+
+      const [updatedUser] = await db
+        .update(users)
+        .set({ email: newEmail.toLowerCase(), updatedAt: new Date() })
+        .where(eq(users.id, userId))
+        .returning();
+
+      res.json({
+        id: updatedUser.id,
+        email: updatedUser.email,
+        firstName: updatedUser.firstName,
+        lastName: updatedUser.lastName,
+      });
+    } catch (error) {
+      console.error("Error updating email:", error);
+      res.status(500).json({ message: "Failed to update email" });
+    }
+  });
+
+  app.patch("/api/account/password", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId!;
+      
+      const parsed = updatePasswordSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ 
+          message: "Validation failed", 
+          errors: parsed.error.flatten().fieldErrors 
+        });
+      }
+
+      const { currentPassword, newPassword } = parsed.data;
+
+      const user = await findUserById(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+
+      const isValid = await bcrypt.compare(currentPassword, user.passwordHash);
+      if (!isValid) {
+        return res.status(401).json({ message: "Current password is incorrect" });
+      }
+
+      const newPasswordHash = await bcrypt.hash(newPassword, 12);
+
+      await db
+        .update(users)
+        .set({ passwordHash: newPasswordHash, updatedAt: new Date() })
+        .where(eq(users.id, userId));
+
+      res.json({ message: "Password updated successfully" });
+    } catch (error) {
+      console.error("Error updating password:", error);
+      res.status(500).json({ message: "Failed to update password" });
     }
   });
 

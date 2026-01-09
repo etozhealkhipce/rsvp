@@ -22,7 +22,7 @@ Preferred communication style: Simple, everyday language.
 - **Runtime**: Node.js with Express
 - **Language**: TypeScript compiled with tsx
 - **API Design**: RESTful endpoints under `/api/*` prefix
-- **Authentication**: Replit Auth integration using OpenID Connect with Passport.js
+- **Authentication**: Custom email/password authentication with bcrypt password hashing
 - **Session Management**: PostgreSQL-backed sessions via connect-pg-simple
 
 ### Data Storage
@@ -30,10 +30,22 @@ Preferred communication style: Simple, everyday language.
 - **Schema Location**: `shared/schema.ts` defines all database tables
 - **Tables**: 
   - `sessions` - User session storage (required for auth)
-  - `users` - User profiles from Replit Auth
+  - `users` - User profiles with email, passwordHash, and profile info
   - `subscriptions` - Free/premium tier status and WPM limits
   - `user_preferences` - Reading settings (WPM, font size, gradual start, pause on punctuation)
 - **Client-side Storage**: IndexedDB stores all reading content locally, including text content, word count, reading progress, and per-text settings
+
+### Authentication System
+- **Password Security**: bcrypt with 12 salt rounds for secure password hashing
+- **Session Handling**: express-session with PostgreSQL store, session regeneration on login
+- **Endpoints**:
+  - `POST /api/auth/register` - Create new account
+  - `POST /api/auth/login` - Authenticate existing user
+  - `POST /api/auth/logout` - End session
+  - `GET /api/auth/me` - Get current user
+  - `PATCH /api/account/email` - Update email (requires password confirmation)
+  - `PATCH /api/account/password` - Change password (requires current password)
+- **Shared Types**: `shared/types/auth.ts` contains AuthUser interface and validation schemas
 
 ### Key Design Decisions
 - **Local-first content**: Books and texts are stored in IndexedDB to enable offline reading and reduce server load. The server only manages auth and subscription status.
@@ -48,11 +60,12 @@ Preferred communication style: Simple, everyday language.
 - Drizzle ORM for type-safe database queries
 - Schema migrations in `/migrations` directory, run with `npm run db:push`
 
-### Authentication
-- Replit Auth (OpenID Connect provider)
-- Required environment variables: `ISSUER_URL`, `REPL_ID`, `SESSION_SECRET`
+### Environment Variables
+- `DATABASE_URL` - PostgreSQL connection string (required)
+- `SESSION_SECRET` - Secret key for session encryption (required, app will fail to start without it)
 
 ### Third-Party Libraries
+- bcrypt for password hashing
 - Radix UI primitives for accessible components
 - TanStack Query for data fetching
 - date-fns for date formatting
