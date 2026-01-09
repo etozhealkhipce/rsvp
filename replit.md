@@ -57,18 +57,28 @@ Preferred communication style: Simple, everyday language.
 ### Telegram Payment Integration
 The app uses Telegram Stars for premium subscription payments with secure token-based account linking:
 1. User clicks "Buy Premium via Telegram" on settings page
-2. Frontend requests a signed, time-limited token from the server
+2. Frontend requests a time-limited token from the server (expires in 1 minute)
 3. Opens Telegram bot with deep link containing the secure token
-4. Token is verified (signature + 1-hour expiration) before linking Telegram account
-5. Bot sends payment invoice for Stars
-6. Pre-checkout validates user and price match
-7. After payment, webhook activates premium subscription
+4. Token is verified and deleted after use (one-time use)
+5. Bot creates a pending payment record and sends payment invoice (expires in 1 minute)
+6. Pre-checkout validates: user match, price match, payment exists, not expired, not already paid
+7. After payment, webhook marks payment as paid and activates premium subscription
 8. User returns to app with premium active
 
+**Multi-account support**: One Telegram account can pay for multiple app accounts.
+
+**Bot commands**:
+- `/history` - View payment history and linked accounts
+
 **Security measures**:
-- Token-based linking prevents Telegram account hijacking
-- Unique constraint on telegram_user_id prevents multi-account abuse
-- Payment validation checks user match and price before accepting
+- Token-based linking with 1-minute expiration
+- Payment records track each invoice with unique chargeId to prevent double payments
+- Expired invoices are rejected at pre-checkout
+- Already-processed payments are rejected
+
+**Database tables**:
+- `telegram_link_tokens` - Short-lived tokens for deep links
+- `telegram_payments` - Payment history with status (pending/paid/expired)
 
 **Webhook endpoint**: `POST /api/telegram-webhook`
 **Setup script**: `npx tsx scripts/setup-telegram-webhook.ts`
