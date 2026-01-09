@@ -69,7 +69,7 @@ export function SettingsPage() {
   const generateTokenMutation = useMutation({
     mutationFn: async () => {
       const response = await apiRequest("POST", "/api/subscription/generate-telegram-token", {});
-      return response as unknown as { token: string; subscription: Subscription };
+      return await response.json() as { token: string; subscription: Subscription };
     },
     onSuccess: (data) => {
       const telegramUrl = `https://t.me/${TELEGRAM_BOT_USERNAME}?start=${data.token}`;
