@@ -47,3 +47,13 @@ export const insertUserPreferencesSchema = createInsertSchema(userPreferences).p
 
 export type InsertUserPreferences = z.infer<typeof insertUserPreferencesSchema>;
 export type UserPreferences = typeof userPreferences.$inferSelect;
+
+// Telegram link tokens - short-lived tokens for deep linking
+export const telegramLinkTokens = pgTable("telegram_link_tokens", {
+  id: varchar("id", { length: 16 }).primaryKey(), // Short alphanumeric ID for deep links
+  userId: varchar("user_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  expiresAt: timestamp("expires_at").notNull(),
+});
+
+export type TelegramLinkToken = typeof telegramLinkTokens.$inferSelect;

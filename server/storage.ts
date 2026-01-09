@@ -1,13 +1,15 @@
 import { 
   subscriptions, 
   userPreferences,
+  telegramLinkTokens,
   type Subscription, 
   type InsertSubscription,
   type UserPreferences,
-  type InsertUserPreferences
+  type InsertUserPreferences,
+  type TelegramLinkToken
 } from "@shared/schema";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, gt } from "drizzle-orm";
 
 export interface TelegramPaymentData {
   telegramUserId: string;
@@ -23,6 +25,9 @@ export interface IStorage {
   linkTelegramAccount(userId: string, telegramUserId: string): Promise<Subscription | undefined>;
   getUserPreferences(userId: string): Promise<UserPreferences | undefined>;
   createOrUpdateUserPreferences(preferences: InsertUserPreferences): Promise<UserPreferences>;
+  createTelegramLinkToken(userId: string): Promise<string>;
+  getTelegramLinkToken(tokenId: string): Promise<TelegramLinkToken | undefined>;
+  deleteTelegramLinkToken(tokenId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -121,6 +126,46 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return prefs;
+  }
+
+  async createTelegramLinkToken(userId: string): Promise<string> {
+    // Generate a short alphanumeric ID (12 chars, safe for Telegram deep links)
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+    let tokenId = '';
+    for (let i = 0; i < 12; i++) {
+      tokenId += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    
+    const expiresAt = new Date(Date.now() + 3600000); // 1 hour from now
+    
+    await db.insert(telegramLinkTokens).values({
+      id: tokenId,
+      userId,
+      expiresAt,
+    });
+    
+    return tokenId;
+  }
+
+  async getTelegramLinkToken(tokenId: string): Promise<TelegramLinkToken | undefined> {
+    const [token] = await db
+      .select()
+      .from(telegramLinkTokens)
+      .where(eq(telegramLinkTokens.id, tokenId));
+    
+    if (!token) return undefined;
+    
+    // Check if expired
+    if (new Date() > token.expiresAt) {
+      await this.deleteTelegramLinkToken(tokenId);
+      return undefined;
+    }
+    
+    return token;
+  }
+
+  async deleteTelegramLinkToken(tokenId: string): Promise<void> {
+    await db.delete(telegramLinkTokens).where(eq(telegramLinkTokens.id, tokenId));
   }
 }
 

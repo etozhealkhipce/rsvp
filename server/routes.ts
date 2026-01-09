@@ -286,24 +286,8 @@ export async function registerRoutes(
           });
         }
 
-        // Generate a signed token: base64(userId:timestamp:hash)
-        // Uses TELEGRAM_TOKEN_SECRET (dedicated) or falls back to SESSION_SECRET
-        const timestamp = Date.now();
-        const secret =
-          process.env.TELEGRAM_TOKEN_SECRET ||
-          process.env.SESSION_SECRET ||
-          "fallback-secret";
-        const payload = `${userId}:${timestamp}`;
-        const hash = Buffer.from(
-          await crypto.subtle.digest(
-            "SHA-256",
-            new TextEncoder().encode(payload + secret),
-          ),
-        )
-          .toString("base64")
-          .substring(0, 16);
-
-        const token = Buffer.from(`${payload}:${hash}`).toString("base64url");
+        // Generate a short token stored in database (12 chars, fits Telegram's 64 char limit)
+        const token = await storage.createTelegramLinkToken(userId);
 
         res.json({ token, subscription });
       } catch (error) {
@@ -319,10 +303,6 @@ export async function registerRoutes(
       const update = req.body;
       const botToken = process.env.TELEGRAM_BOT_TOKEN;
       const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
-      const tokenSecret =
-        process.env.TELEGRAM_TOKEN_SECRET ||
-        process.env.SESSION_SECRET ||
-        "fallback-secret";
       const starsPrice = parseInt(
         process.env.TELEGRAM_STARS_PRICE || "100",
         10,
@@ -353,98 +333,71 @@ export async function registerRoutes(
         const args = update.message.text.split(" ");
 
         if (args.length > 1) {
-          const token = args[1];
-          console.log("Processing /start with token, chatId:", chatId, "telegramUserId:", telegramUserId);
+          const tokenId = args[1];
+          console.log("Processing /start with token:", tokenId, "chatId:", chatId, "telegramUserId:", telegramUserId);
 
-          // Verify token
-          try {
-            const decoded = Buffer.from(token, "base64url").toString();
-            const [userId, timestamp, hash] = decoded.split(":");
-            console.log("Token decoded - userId:", userId, "tokenAge:", Date.now() - parseInt(timestamp, 10), "ms");
-
-            // Check token age (valid for 1 hour)
-            const tokenAge = Date.now() - parseInt(timestamp, 10);
-            if (tokenAge > 3600000) {
-              await sendTelegramMessage(
-                botToken,
-                chatId,
-                "Link expired. Please get a new link from the website.",
-              );
-              return res.json({ ok: true });
-            }
-
-            // Verify hash
-            const expectedPayload = `${userId}:${timestamp}`;
-            const expectedHashBuffer = await crypto.subtle.digest(
-              "SHA-256",
-              new TextEncoder().encode(expectedPayload + tokenSecret),
-            );
-            const expectedHash = Buffer.from(expectedHashBuffer)
-              .toString("base64")
-              .substring(0, 16);
-
-            if (hash !== expectedHash) {
-              await sendTelegramMessage(
-                botToken,
-                chatId,
-                "Invalid link. Please get a new link from the website.",
-              );
-              return res.json({ ok: true });
-            }
-
-            // Check if Telegram ID is already linked to another account
-            const existingSub =
-              await storage.getSubscriptionByTelegramId(telegramUserId);
-            if (existingSub && existingSub.userId !== userId) {
-              await sendTelegramMessage(
-                botToken,
-                chatId,
-                "This Telegram account is already linked to another RSVP Reader account.",
-              );
-              return res.json({ ok: true });
-            }
-
-            // Get subscription
-            let subscription = await storage.getSubscription(userId);
-            if (!subscription) {
-              subscription = await storage.createOrUpdateSubscription({
-                userId,
-                tier: "free",
-                maxWpm: 350,
-              });
-            }
-
-            // Link Telegram account
-            try {
-              await storage.linkTelegramAccount(userId, telegramUserId);
-            } catch (linkError: any) {
-              if (linkError.message.includes("already linked")) {
-                await sendTelegramMessage(botToken, chatId, linkError.message);
-                return res.json({ ok: true });
-              }
-              throw linkError;
-            }
-
-            if (subscription.tier === "premium") {
-              await sendTelegramMessage(
-                botToken,
-                chatId,
-                "Your account is already Premium! Return to the app to continue reading.",
-              );
-            } else {
-              await sendPaymentInvoice(
-                botToken,
-                chatId,
-                telegramUserId,
-                userId,
-              );
-            }
-          } catch (e: any) {
-            console.error("Token verification error:", e);
+          // Look up token in database
+          const linkToken = await storage.getTelegramLinkToken(tokenId);
+          
+          if (!linkToken) {
             await sendTelegramMessage(
               botToken,
               chatId,
-              "Invalid link. Please get a new link from the website.",
+              "Link expired or invalid. Please get a new link from the website.",
+            );
+            return res.json({ ok: true });
+          }
+
+          const userId = linkToken.userId;
+          console.log("Token valid for userId:", userId);
+
+          // Delete token after use (one-time use)
+          await storage.deleteTelegramLinkToken(tokenId);
+
+          // Check if Telegram ID is already linked to another account
+          const existingSub = await storage.getSubscriptionByTelegramId(telegramUserId);
+          if (existingSub && existingSub.userId !== userId) {
+            await sendTelegramMessage(
+              botToken,
+              chatId,
+              "This Telegram account is already linked to another RSVP Reader account.",
+            );
+            return res.json({ ok: true });
+          }
+
+          // Get subscription
+          let subscription = await storage.getSubscription(userId);
+          if (!subscription) {
+            subscription = await storage.createOrUpdateSubscription({
+              userId,
+              tier: "free",
+              maxWpm: 350,
+            });
+          }
+
+          // Link Telegram account
+          try {
+            await storage.linkTelegramAccount(userId, telegramUserId);
+          } catch (linkError: any) {
+            if (linkError.message.includes("already linked")) {
+              await sendTelegramMessage(botToken, chatId, linkError.message);
+              return res.json({ ok: true });
+            }
+            throw linkError;
+          }
+
+          if (subscription.tier === "premium") {
+            await sendTelegramMessage(
+              botToken,
+              chatId,
+              "Your account is already Premium! Return to the app to continue reading.",
+            );
+          } else {
+            await sendPaymentInvoice(
+              botToken,
+              chatId,
+              telegramUserId,
+              userId,
             );
           }
         } else {
