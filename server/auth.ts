@@ -85,25 +85,20 @@ export function setupAuthRoutes(): Router {
 
       const user = await createUser(email, password, firstName, lastName);
       
-      req.session.regenerate((err) => {
+      req.session.userId = user.id;
+      
+      req.session.save((err) => {
         if (err) {
+          console.error("Session save error:", err);
           return res.status(500).json({ message: "Session error" });
         }
         
-        req.session.userId = user.id;
-        
-        req.session.save((err) => {
-          if (err) {
-            return res.status(500).json({ message: "Session error" });
-          }
-          
-          res.status(201).json({
-            id: user.id,
-            email: user.email,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            profileImageUrl: user.profileImageUrl,
-          });
+        res.status(201).json({
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          profileImageUrl: user.profileImageUrl,
         });
       });
     } catch (error) {
@@ -135,25 +130,20 @@ export function setupAuthRoutes(): Router {
         return res.status(401).json({ message: "Invalid email or password" });
       }
 
-      req.session.regenerate((err) => {
+      req.session.userId = user.id;
+      
+      req.session.save((err) => {
         if (err) {
+          console.error("Session save error:", err);
           return res.status(500).json({ message: "Session error" });
         }
         
-        req.session.userId = user.id;
-        
-        req.session.save((err) => {
-          if (err) {
-            return res.status(500).json({ message: "Session error" });
-          }
-          
-          res.json({
-            id: user.id,
-            email: user.email,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            profileImageUrl: user.profileImageUrl,
-          });
+        res.json({
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          profileImageUrl: user.profileImageUrl,
         });
       });
     } catch (error) {

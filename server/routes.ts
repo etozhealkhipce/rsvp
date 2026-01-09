@@ -31,7 +31,7 @@ export async function registerRoutes(
     session({
       store: new PostgresStore({
         pool,
-        createTableIfMissing: true,
+        tableName: "sessions",
       }),
       secret: sessionSecret,
       resave: false,
