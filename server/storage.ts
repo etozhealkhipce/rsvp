@@ -151,7 +151,7 @@ export class DatabaseStorage implements IStorage {
       tokenId += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     
-    const expiresAt = new Date(Date.now() + 3600000); // 1 hour from now
+    const expiresAt = new Date(Date.now() + 60000); // 1 minute from now
     
     await db.insert(telegramLinkTokens).values({
       id: tokenId,

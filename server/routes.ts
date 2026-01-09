@@ -317,7 +317,6 @@ export async function registerRoutes(
       );
 
       // Verify webhook authenticity using Telegram's secret_token header
-      // Note: Some proxies/CDNs may strip the header, so we log but don't reject
       if (webhookSecret) {
         const receivedSecret = req.headers["x-telegram-bot-api-secret-token"];
         if (receivedSecret !== webhookSecret) {
@@ -326,8 +325,19 @@ export async function registerRoutes(
             receivedSecret ? "present" : "missing",
             ")",
           );
-          // Continue processing - Telegram's IP verification provides baseline security
         }
+      }
+
+      // Expire old pending payments periodically
+      await storage.expireOldPayments();
+
+      // Handle /history command - show payment history
+      if (update.message?.text === "/history") {
+        const chatId = update.message.chat.id;
+        const telegramUserId = update.message.from.id.toString();
+        
+        await handleHistoryCommand(botToken, chatId, telegramUserId);
+        return res.json({ ok: true });
       }
 
       // Handle /start command - link account with secure token
@@ -354,7 +364,7 @@ export async function registerRoutes(
             await sendTelegramMessage(
               botToken,
               chatId,
-              "Link expired or invalid. Please get a new link from the website.",
+              "Link expired or invalid. Please get a new link from the website (links expire in 1 minute).",
             );
             return res.json({ ok: true });
           }
@@ -365,19 +375,7 @@ export async function registerRoutes(
           // Delete token after use (one-time use)
           await storage.deleteTelegramLinkToken(tokenId);
 
-          // Check if Telegram ID is already linked to another account
-          const existingSub =
-            await storage.getSubscriptionByTelegramId(telegramUserId);
-          if (existingSub && existingSub.userId !== userId) {
-            await sendTelegramMessage(
-              botToken,
-              chatId,
-              "This Telegram account is already linked to another RSVP Reader account.",
-            );
-            return res.json({ ok: true });
-          }
-
-          // Get subscription
+          // Get or create subscription
           let subscription = await storage.getSubscription(userId);
           if (!subscription) {
             subscription = await storage.createOrUpdateSubscription({
@@ -387,7 +385,11 @@ export async function registerRoutes(
             });
           }
 
-          // Link Telegram account
+          // Get user email for display
+          const user = await findUserById(userId);
+          const userEmail = user?.email || "Unknown";
+
+          // Link Telegram account (now allows multiple app accounts per TG user)
           try {
             await storage.linkTelegramAccount(userId, telegramUserId);
           } catch (linkError: any) {
@@ -402,16 +404,27 @@ export async function registerRoutes(
             await sendTelegramMessage(
               botToken,
               chatId,
-              "Your account is already Premium! Return to the app to continue reading.",
+              `Account *${userEmail}* is already Premium! Return to the app to continue reading.`,
             );
           } else {
-            await sendPaymentInvoice(botToken, chatId, telegramUserId, userId);
+            // Create pending payment record with 1-minute expiry
+            const expiresAt = new Date(Date.now() + 60000); // 1 minute
+            const payment = await storage.createTelegramPayment({
+              telegramUserId,
+              telegramChatId: chatId.toString(),
+              userId,
+              userEmail,
+              amount: starsPrice,
+              expiresAt,
+            });
+
+            await sendPaymentInvoice(botToken, chatId, telegramUserId, userId, payment.id, userEmail, starsPrice);
           }
         } else {
           await sendTelegramMessage(
             botToken,
             chatId,
-            "Welcome! Please use the 'Buy Premium' button on the RSVP Reader website to start.",
+            "Welcome to RSVP Reader!\n\nUse the 'Buy Premium' button on the website to link your account.\n\nCommands:\n/history - View your payment history and accounts",
           );
         }
 
@@ -426,68 +439,45 @@ export async function registerRoutes(
         try {
           const parsedPayload = JSON.parse(payload);
           const telegramUserId = update.pre_checkout_query.from.id.toString();
+          const paymentId = parsedPayload.paymentId;
 
           // Verify telegram user matches payload
           if (parsedPayload.telegramUserId !== telegramUserId) {
-            await fetch(
-              `https://api.telegram.org/bot${botToken}/answerPreCheckoutQuery`,
-              {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  pre_checkout_query_id: queryId,
-                  ok: false,
-                  error_message:
-                    "User mismatch. Please restart the payment process.",
-                }),
-              },
-            );
+            await answerPreCheckout(botToken, queryId, false, "User mismatch. Please restart the payment process.");
             return res.json({ ok: true });
           }
 
           // Verify price matches
           if (update.pre_checkout_query.total_amount !== starsPrice) {
-            await fetch(
-              `https://api.telegram.org/bot${botToken}/answerPreCheckoutQuery`,
-              {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  pre_checkout_query_id: queryId,
-                  ok: false,
-                  error_message:
-                    "Price mismatch. Please restart the payment process.",
-                }),
-              },
-            );
+            await answerPreCheckout(botToken, queryId, false, "Price mismatch. Please restart the payment process.");
+            return res.json({ ok: true });
+          }
+
+          // Check if payment record exists and is valid
+          const pendingPayment = await storage.getTelegramPayment(paymentId);
+          
+          if (!pendingPayment) {
+            await answerPreCheckout(botToken, queryId, false, "Payment not found. Please get a new invoice from the website.");
+            return res.json({ ok: true });
+          }
+
+          if (pendingPayment.status !== "pending") {
+            await answerPreCheckout(botToken, queryId, false, "This invoice has already been processed or expired.");
+            return res.json({ ok: true });
+          }
+
+          // Check if invoice expired (1 minute)
+          if (new Date() > new Date(pendingPayment.expiresAt)) {
+            await storage.markPaymentExpired(paymentId);
+            await answerPreCheckout(botToken, queryId, false, "Invoice expired. Please get a new one from the website.");
             return res.json({ ok: true });
           }
 
           // Approve payment
-          await fetch(
-            `https://api.telegram.org/bot${botToken}/answerPreCheckoutQuery`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                pre_checkout_query_id: queryId,
-                ok: true,
-              }),
-            },
-          );
+          await answerPreCheckout(botToken, queryId, true);
         } catch (e) {
-          await fetch(
-            `https://api.telegram.org/bot${botToken}/answerPreCheckoutQuery`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                pre_checkout_query_id: queryId,
-                ok: false,
-                error_message: "Invalid payment data.",
-              }),
-            },
-          );
+          console.error("Pre-checkout error:", e);
+          await answerPreCheckout(botToken, queryId, false, "Invalid payment data.");
         }
 
         return res.json({ ok: true });
@@ -500,34 +490,43 @@ export async function registerRoutes(
         const chatId = update.message.chat.id;
         const chargeId = payment.telegram_payment_charge_id;
 
-        // Verify payment data
         try {
           const parsedPayload = JSON.parse(payment.invoice_payload);
+          const paymentId = parsedPayload.paymentId;
+          const userId = parsedPayload.userId;
 
           // Verify telegram user matches
           if (parsedPayload.telegramUserId !== telegramUserId) {
-            console.error("Payment user mismatch:", {
-              payload: parsedPayload,
-              telegramUserId,
-            });
+            console.error("Payment user mismatch:", { payload: parsedPayload, telegramUserId });
             return res.json({ ok: true });
           }
 
-          // Activate premium
-          const subscription = await storage.activatePremiumByTelegram(
-            telegramUserId,
-            {
-              telegramUserId,
-              telegramPaymentChargeId: chargeId,
-              paidAt: new Date(),
-            },
-          );
-
-          if (subscription) {
+          // Mark payment as paid (with unique chargeId to prevent double processing)
+          const paidPayment = await storage.markPaymentPaid(paymentId, chargeId);
+          
+          if (!paidPayment) {
+            console.error("Failed to mark payment as paid:", paymentId);
             await sendTelegramMessage(
               botToken,
               chatId,
-              `Payment successful! Your Premium subscription is now active.\n\nYou can now read at speeds up to 1000 WPM. Return to the RSVP Reader app to enjoy your premium features!`,
+              "Payment received, but there was an issue processing. Please contact support.",
+            );
+            return res.json({ ok: true });
+          }
+
+          // Activate premium using userId (not telegramUserId)
+          const subscription = await storage.activatePremiumByUserId(userId, {
+            telegramUserId,
+            telegramPaymentChargeId: chargeId,
+            paidAt: new Date(),
+          });
+
+          if (subscription) {
+            const user = await findUserById(userId);
+            await sendTelegramMessage(
+              botToken,
+              chatId,
+              `Payment successful! Premium activated for *${user?.email || "your account"}*.\n\nYou can now read at speeds up to 1000 WPM. Return to the app to enjoy your premium features!\n\nUse /history to see all your accounts.`,
             );
           } else {
             await sendTelegramMessage(
@@ -570,19 +569,107 @@ async function sendTelegramMessage(
   });
 }
 
+async function answerPreCheckout(
+  botToken: string,
+  queryId: string,
+  ok: boolean,
+  errorMessage?: string,
+): Promise<boolean> {
+  try {
+    const response = await fetch(
+      `https://api.telegram.org/bot${botToken}/answerPreCheckoutQuery`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pre_checkout_query_id: queryId,
+          ok,
+          ...(errorMessage && { error_message: errorMessage }),
+        }),
+      },
+    );
+    const result = await response.json();
+    return result.ok === true;
+  } catch (e) {
+    console.error("Failed to answer pre-checkout:", e);
+    return false;
+  }
+}
+
+async function handleHistoryCommand(
+  botToken: string,
+  chatId: number,
+  telegramUserId: string,
+) {
+  try {
+    // Get payment history and subscriptions in parallel
+    const [payments, linkedSubscriptions] = await Promise.all([
+      storage.getPaymentHistory(telegramUserId),
+      storage.getSubscriptionsByTelegramId(telegramUserId),
+    ]);
+    
+    // Batch fetch all user emails
+    const userIds = linkedSubscriptions.map(s => s.userId);
+    const userEmails = new Map<string, string>();
+    
+    // Fetch users in parallel (limited batch)
+    const userPromises = userIds.slice(0, 10).map(async (userId) => {
+      const user = await findUserById(userId);
+      if (user) userEmails.set(userId, user.email);
+    });
+    await Promise.all(userPromises);
+    
+    let message = "*Your RSVP Reader Accounts*\n\n";
+    
+    if (linkedSubscriptions.length === 0) {
+      message += "No accounts linked yet. Use the website to link your account.\n\n";
+    } else {
+      message += "*Linked Accounts:*\n";
+      for (const sub of linkedSubscriptions.slice(0, 10)) {
+        const status = sub.tier === "premium" ? "Premium" : "Free";
+        const email = userEmails.get(sub.userId) || "Unknown";
+        message += `• ${email} - ${status}\n`;
+      }
+      message += "\n";
+    }
+    
+    if (payments.length === 0) {
+      message += "*Payment History:*\nNo payments yet.";
+    } else {
+      message += "*Recent Payments:*\n";
+      for (const payment of payments.slice(0, 5)) {
+        const date = payment.paidAt 
+          ? new Date(payment.paidAt).toLocaleDateString() 
+          : new Date(payment.createdAt!).toLocaleDateString();
+        const statusIcon = payment.status === "paid" ? "✓" : payment.status === "expired" ? "✗" : "⏳";
+        message += `${statusIcon} ${payment.userEmail || "Unknown"} - ${payment.amount} Stars - ${payment.status} (${date})\n`;
+      }
+    }
+    
+    await sendTelegramMessage(botToken, chatId, message);
+  } catch (e) {
+    console.error("Error handling /history command:", e);
+    await sendTelegramMessage(botToken, chatId, "Sorry, there was an error fetching your history. Please try again later.");
+  }
+}
+
 async function sendPaymentInvoice(
   botToken: string,
   chatId: number,
   telegramUserId: string,
   userId: string,
+  paymentId: string,
+  userEmail: string,
+  starsPrice: number,
 ) {
-  const starsPrice = parseInt(process.env.TELEGRAM_STARS_PRICE || "1", 10);
   console.log(
     "Sending payment invoice to chatId:",
     chatId,
     "price:",
     starsPrice,
     "Stars",
+    "paymentId:",
+    paymentId,
   );
 
   const response = await fetch(
@@ -593,11 +680,11 @@ async function sendPaymentInvoice(
       body: JSON.stringify({
         chat_id: chatId,
         title: "RSVP Reader Premium",
-        description:
-          "Unlock reading speeds up to 1000 WPM and all premium features",
+        description: `Upgrade ${userEmail} to Premium - Read at up to 1000 WPM. This invoice expires in 1 minute.`,
         payload: JSON.stringify({
           telegramUserId,
           userId,
+          paymentId,
           timestamp: Date.now(),
         }),
         currency: "XTR",
