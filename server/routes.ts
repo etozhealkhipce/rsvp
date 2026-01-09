@@ -218,97 +218,276 @@ export async function registerRoutes(
     }
   });
 
-  // Gumroad license verification
-  app.post("/api/subscription/verify-license", requireAuth, async (req: Request, res: Response) => {
+  // Generate secure token for Telegram linking
+  app.post("/api/subscription/generate-telegram-token", requireAuth, async (req: Request, res: Response) => {
     try {
       const userId = req.session.userId!;
-      const { licenseKey } = req.body;
-
-      if (!licenseKey || typeof licenseKey !== "string") {
-        return res.status(400).json({ message: "License key is required" });
+      
+      // Ensure subscription exists
+      let subscription = await storage.getSubscription(userId);
+      if (!subscription) {
+        subscription = await storage.createOrUpdateSubscription({
+          userId,
+          tier: "free",
+          maxWpm: 350,
+        });
       }
 
-      const productId = process.env.GUMROAD_PRODUCT_ID;
-      if (!productId) {
-        return res.status(500).json({ message: "Gumroad not configured" });
-      }
-
-      // Verify license with Gumroad API
-      const requestBody = new URLSearchParams();
-      requestBody.append("product_id", productId);
-      requestBody.append("license_key", licenseKey.trim());
-      requestBody.append("increment_uses_count", "false");
-
-      const gumroadResponse = await fetch("https://api.gumroad.com/v2/licenses/verify", {
-        method: "POST",
-        body: requestBody,
-      });
-
-      const gumroadData = await gumroadResponse.json();
-
-      if (!gumroadData.success) {
-        return res.status(400).json({ message: "Invalid license key" });
-      }
-
-      // Check if subscription is active (not refunded, disputed, or cancelled)
-      const purchase = gumroadData.purchase;
-      if (purchase.refunded || purchase.disputed) {
-        return res.status(400).json({ message: "This license has been refunded or disputed" });
-      }
-
-      if (purchase.subscription_cancelled_at || purchase.subscription_failed_at) {
-        return res.status(400).json({ message: "This subscription has ended" });
-      }
-
-      // Update subscription to premium
-      await storage.createOrUpdateSubscription({
-        userId,
-        tier: "premium",
-        maxWpm: 1000,
-      });
-
-      // Store license info and get updated subscription
-      const updatedSubscription = await storage.updateSubscriptionLicense(userId, {
-        gumroadLicenseKey: licenseKey.trim(),
-        gumroadProductId: productId,
-        licenseEmail: purchase.email,
-        licenseValidatedAt: new Date(),
-      });
-
-      res.json({
-        ...updatedSubscription,
-        message: "Premium subscription activated!",
-      });
+      // Generate a signed token: base64(userId:timestamp:hash)
+      // Uses TELEGRAM_TOKEN_SECRET (dedicated) or falls back to SESSION_SECRET
+      const timestamp = Date.now();
+      const secret = process.env.TELEGRAM_TOKEN_SECRET || process.env.SESSION_SECRET || "fallback-secret";
+      const payload = `${userId}:${timestamp}`;
+      const hash = Buffer.from(
+        await crypto.subtle.digest("SHA-256", new TextEncoder().encode(payload + secret))
+      ).toString("base64").substring(0, 16);
+      
+      const token = Buffer.from(`${payload}:${hash}`).toString("base64url");
+      
+      res.json({ token, subscription });
     } catch (error) {
-      console.error("Error verifying license:", error);
-      res.status(500).json({ message: "Failed to verify license" });
+      console.error("Error generating token:", error);
+      res.status(500).json({ message: "Failed to generate token" });
     }
   });
 
-  // Remove license / downgrade to free
-  app.post("/api/subscription/remove-license", requireAuth, async (req: Request, res: Response) => {
+  // Telegram webhook for bot updates and payments
+  app.post("/api/telegram-webhook", async (req: Request, res: Response) => {
     try {
-      const userId = req.session.userId!;
+      const update = req.body;
+      const botToken = process.env.TELEGRAM_BOT_TOKEN;
+      const secret = process.env.TELEGRAM_TOKEN_SECRET || process.env.SESSION_SECRET || "fallback-secret";
+      const starsPrice = parseInt(process.env.TELEGRAM_STARS_PRICE || "100", 10);
 
-      const subscription = await storage.createOrUpdateSubscription({
-        userId,
-        tier: "free",
-        maxWpm: 350,
-      });
+      if (!botToken) {
+        console.error("TELEGRAM_BOT_TOKEN not configured");
+        return res.json({ ok: true });
+      }
 
-      await storage.updateSubscriptionLicense(userId, {
-        gumroadLicenseKey: null,
-        gumroadProductId: null,
-        licenseEmail: null,
-        licenseValidatedAt: null,
-      });
+      // Handle /start command - link account with secure token
+      if (update.message?.text?.startsWith("/start")) {
+        const chatId = update.message.chat.id;
+        const telegramUserId = update.message.from.id.toString();
+        const args = update.message.text.split(" ");
+        
+        if (args.length > 1) {
+          const token = args[1];
+          
+          // Verify token
+          try {
+            const decoded = Buffer.from(token, "base64url").toString();
+            const [userId, timestamp, hash] = decoded.split(":");
+            
+            // Check token age (valid for 1 hour)
+            const tokenAge = Date.now() - parseInt(timestamp, 10);
+            if (tokenAge > 3600000) {
+              await sendTelegramMessage(botToken, chatId, "Link expired. Please get a new link from the website.");
+              return res.json({ ok: true });
+            }
+            
+            // Verify hash
+            const expectedPayload = `${userId}:${timestamp}`;
+            const expectedHashBuffer = await crypto.subtle.digest(
+              "SHA-256", 
+              new TextEncoder().encode(expectedPayload + secret)
+            );
+            const expectedHash = Buffer.from(expectedHashBuffer).toString("base64").substring(0, 16);
+            
+            if (hash !== expectedHash) {
+              await sendTelegramMessage(botToken, chatId, "Invalid link. Please get a new link from the website.");
+              return res.json({ ok: true });
+            }
 
-      res.json({ ...subscription, message: "Subscription downgraded to free" });
+            // Check if Telegram ID is already linked to another account
+            const existingSub = await storage.getSubscriptionByTelegramId(telegramUserId);
+            if (existingSub && existingSub.userId !== userId) {
+              await sendTelegramMessage(
+                botToken, 
+                chatId, 
+                "This Telegram account is already linked to another RSVP Reader account."
+              );
+              return res.json({ ok: true });
+            }
+
+            // Get subscription
+            let subscription = await storage.getSubscription(userId);
+            if (!subscription) {
+              subscription = await storage.createOrUpdateSubscription({
+                userId,
+                tier: "free",
+                maxWpm: 350,
+              });
+            }
+
+            // Link Telegram account
+            try {
+              await storage.linkTelegramAccount(userId, telegramUserId);
+            } catch (linkError: any) {
+              if (linkError.message.includes("already linked")) {
+                await sendTelegramMessage(botToken, chatId, linkError.message);
+                return res.json({ ok: true });
+              }
+              throw linkError;
+            }
+            
+            if (subscription.tier === "premium") {
+              await sendTelegramMessage(botToken, chatId, "Your account is already Premium! Return to the app to continue reading.");
+            } else {
+              await sendPaymentInvoice(botToken, chatId, telegramUserId, userId);
+            }
+          } catch (e: any) {
+            console.error("Token verification error:", e);
+            await sendTelegramMessage(botToken, chatId, "Invalid link. Please get a new link from the website.");
+          }
+        } else {
+          await sendTelegramMessage(botToken, chatId, "Welcome! Please use the 'Buy Premium' button on the RSVP Reader website to start.");
+        }
+        
+        return res.json({ ok: true });
+      }
+
+      // Handle pre-checkout query (approve payment with validation)
+      if (update.pre_checkout_query) {
+        const queryId = update.pre_checkout_query.id;
+        const payload = update.pre_checkout_query.invoice_payload;
+        
+        try {
+          const parsedPayload = JSON.parse(payload);
+          const telegramUserId = update.pre_checkout_query.from.id.toString();
+          
+          // Verify telegram user matches payload
+          if (parsedPayload.telegramUserId !== telegramUserId) {
+            await fetch(`https://api.telegram.org/bot${botToken}/answerPreCheckoutQuery`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                pre_checkout_query_id: queryId,
+                ok: false,
+                error_message: "User mismatch. Please restart the payment process.",
+              }),
+            });
+            return res.json({ ok: true });
+          }
+          
+          // Verify price matches
+          if (update.pre_checkout_query.total_amount !== starsPrice) {
+            await fetch(`https://api.telegram.org/bot${botToken}/answerPreCheckoutQuery`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                pre_checkout_query_id: queryId,
+                ok: false,
+                error_message: "Price mismatch. Please restart the payment process.",
+              }),
+            });
+            return res.json({ ok: true });
+          }
+
+          // Approve payment
+          await fetch(`https://api.telegram.org/bot${botToken}/answerPreCheckoutQuery`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              pre_checkout_query_id: queryId,
+              ok: true,
+            }),
+          });
+        } catch (e) {
+          await fetch(`https://api.telegram.org/bot${botToken}/answerPreCheckoutQuery`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              pre_checkout_query_id: queryId,
+              ok: false,
+              error_message: "Invalid payment data.",
+            }),
+          });
+        }
+        
+        return res.json({ ok: true });
+      }
+
+      // Handle successful payment
+      if (update.message?.successful_payment) {
+        const payment = update.message.successful_payment;
+        const telegramUserId = update.message.from.id.toString();
+        const chatId = update.message.chat.id;
+        const chargeId = payment.telegram_payment_charge_id;
+
+        // Verify payment data
+        try {
+          const parsedPayload = JSON.parse(payment.invoice_payload);
+          
+          // Verify telegram user matches
+          if (parsedPayload.telegramUserId !== telegramUserId) {
+            console.error("Payment user mismatch:", { payload: parsedPayload, telegramUserId });
+            return res.json({ ok: true });
+          }
+
+          // Activate premium
+          const subscription = await storage.activatePremiumByTelegram(telegramUserId, {
+            telegramUserId,
+            telegramPaymentChargeId: chargeId,
+            paidAt: new Date(),
+          });
+
+          if (subscription) {
+            await sendTelegramMessage(
+              botToken,
+              chatId,
+              `Payment successful! Your Premium subscription is now active.\n\nYou can now read at speeds up to 1000 WPM. Return to the RSVP Reader app to enjoy your premium features!`
+            );
+          } else {
+            await sendTelegramMessage(
+              botToken,
+              chatId,
+              "Payment received, but there was an issue activating your subscription. Please contact support."
+            );
+          }
+        } catch (e) {
+          console.error("Payment processing error:", e);
+        }
+        
+        return res.json({ ok: true });
+      }
+
+      res.json({ ok: true });
     } catch (error) {
-      console.error("Error removing license:", error);
-      res.status(500).json({ message: "Failed to remove license" });
+      console.error("Telegram webhook error:", error);
+      res.json({ ok: true });
     }
   });
 
   return httpServer;
+}
+
+// Helper functions for Telegram API
+async function sendTelegramMessage(botToken: string, chatId: number, text: string) {
+  await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text,
+      parse_mode: "Markdown",
+    }),
+  });
+}
+
+async function sendPaymentInvoice(botToken: string, chatId: number, telegramUserId: string, userId: string) {
+  const starsPrice = parseInt(process.env.TELEGRAM_STARS_PRICE || "100", 10);
+  
+  await fetch(`https://api.telegram.org/bot${botToken}/sendInvoice`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      chat_id: chatId,
+      title: "RSVP Reader Premium",
+      description: "Unlock reading speeds up to 1000 WPM and all premium features",
+      payload: JSON.stringify({ telegramUserId, userId, timestamp: Date.now() }),
+      currency: "XTR",
+      prices: [{ label: "Premium", amount: starsPrice }],
+      provider_token: "",
+    }),
+  });
 }

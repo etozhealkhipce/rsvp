@@ -4,7 +4,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { ArrowLeft, Eye, EyeOff, User, Lock, Crown, Zap, ExternalLink } from "lucide-react";
+import { ArrowLeft, Eye, EyeOff, User, Lock, Crown, Zap } from "lucide-react";
+import { SiTelegram } from "react-icons/si";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,13 +32,10 @@ const passwordFormSchema = z.object({
   path: ["confirmPassword"],
 });
 
-const licenseSchema = z.object({
-  licenseKey: z.string().min(1, "License key is required"),
-});
-
 type EmailFormData = z.infer<typeof emailSchema>;
 type PasswordFormData = { currentPassword: string; newPassword: string };
-type LicenseFormData = z.infer<typeof licenseSchema>;
+
+const TELEGRAM_BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME || "RSVPReaderBot";
 
 export function SettingsPage() {
   const [, navigate] = useLocation();
@@ -49,49 +47,6 @@ export function SettingsPage() {
 
   const { data: subscription, isLoading: isLoadingSubscription } = useQuery<Subscription>({
     queryKey: ["/api/subscription"],
-  });
-
-  const verifyLicenseMutation = useMutation({
-    mutationFn: async (data: LicenseFormData) => {
-      const response = await apiRequest("POST", "/api/subscription/verify-license", data);
-      return response;
-    },
-    onSuccess: () => {
-      toast({
-        title: "Premium activated",
-        description: "Your license has been verified successfully!",
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/subscription"] });
-      licenseForm.reset();
-    },
-    onError: (error: any) => {
-      toast({
-        title: "Verification failed",
-        description: error?.message || "Invalid license key",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const removeLicenseMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/subscription/remove-license", {});
-      return response;
-    },
-    onSuccess: () => {
-      toast({
-        title: "License removed",
-        description: "Your subscription has been downgraded to free.",
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/subscription"] });
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to remove license",
-        variant: "destructive",
-      });
-    },
   });
 
   const emailForm = useForm<EmailFormData>({
@@ -111,12 +66,37 @@ export function SettingsPage() {
     },
   });
 
-  const licenseForm = useForm<LicenseFormData>({
-    resolver: zodResolver(licenseSchema),
-    defaultValues: {
-      licenseKey: "",
+  const generateTokenMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/subscription/generate-telegram-token", {});
+      return response as unknown as { token: string; subscription: Subscription };
+    },
+    onSuccess: (data) => {
+      const telegramUrl = `https://t.me/${TELEGRAM_BOT_USERNAME}?start=${data.token}`;
+      window.open(telegramUrl, "_blank");
+      queryClient.invalidateQueries({ queryKey: ["/api/subscription"] });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to generate payment link. Please try again.",
+        variant: "destructive",
+      });
     },
   });
+
+  const handleBuyPremium = () => {
+    if (!user) {
+      toast({
+        title: "Error",
+        description: "Please log in first",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    generateTokenMutation.mutate();
+  };
 
   const onEmailSubmit = async (data: EmailFormData) => {
     try {
@@ -264,20 +244,12 @@ export function SettingsPage() {
                       <p className="text-sm text-muted-foreground">
                         You have access to reading speeds up to {subscription.maxWpm} WPM and all premium features.
                       </p>
-                      {subscription.licenseEmail && (
+                      {subscription.paidAt && (
                         <p className="text-sm text-muted-foreground mt-2">
-                          License email: {subscription.licenseEmail}
+                          Activated: {new Date(subscription.paidAt).toLocaleDateString()}
                         </p>
                       )}
                     </div>
-                    <Button
-                      variant="outline"
-                      onClick={() => removeLicenseMutation.mutate()}
-                      disabled={removeLicenseMutation.isPending}
-                      data-testid="button-remove-license"
-                    >
-                      {removeLicenseMutation.isPending ? "Removing..." : "Remove License"}
-                    </Button>
                   </div>
                 ) : (
                   <div className="space-y-6">
@@ -309,52 +281,18 @@ export function SettingsPage() {
                     </div>
 
                     <div className="space-y-4">
-                      <div>
-                        <Button asChild variant="default">
-                          <a 
-                            href="https://gumroad.com" 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-2"
-                            data-testid="link-buy-premium"
-                          >
-                            Buy Premium on Gumroad
-                            <ExternalLink className="h-4 w-4" />
-                          </a>
-                        </Button>
-                        <p className="text-xs text-muted-foreground mt-2">
-                          After purchase, enter your license key below
-                        </p>
-                      </div>
-
-                      <Form {...licenseForm}>
-                        <form onSubmit={licenseForm.handleSubmit((data) => verifyLicenseMutation.mutate(data))} className="space-y-4">
-                          <FormField
-                            control={licenseForm.control}
-                            name="licenseKey"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>License Key</FormLabel>
-                                <FormControl>
-                                  <Input
-                                    placeholder="XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX"
-                                    data-testid="input-license-key"
-                                    {...field}
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                          <Button
-                            type="submit"
-                            disabled={verifyLicenseMutation.isPending}
-                            data-testid="button-verify-license"
-                          >
-                            {verifyLicenseMutation.isPending ? "Verifying..." : "Activate License"}
-                          </Button>
-                        </form>
-                      </Form>
+                      <Button 
+                        onClick={handleBuyPremium}
+                        disabled={generateTokenMutation.isPending}
+                        className="flex items-center gap-2 bg-[#0088cc] hover:bg-[#0077b5]"
+                        data-testid="button-buy-premium"
+                      >
+                        <SiTelegram className="h-5 w-5" />
+                        {generateTokenMutation.isPending ? "Opening Telegram..." : "Buy Premium via Telegram"}
+                      </Button>
+                      <p className="text-xs text-muted-foreground">
+                        Pay with Telegram Stars - fast and secure payment through Telegram
+                      </p>
                     </div>
                   </div>
                 )}

@@ -9,17 +9,18 @@ import {
 import { db } from "./db";
 import { eq } from "drizzle-orm";
 
-export interface LicenseUpdateData {
-  gumroadLicenseKey: string | null;
-  gumroadProductId: string | null;
-  licenseEmail: string | null;
-  licenseValidatedAt: Date | null;
+export interface TelegramPaymentData {
+  telegramUserId: string;
+  telegramPaymentChargeId: string;
+  paidAt: Date;
 }
 
 export interface IStorage {
   getSubscription(userId: string): Promise<Subscription | undefined>;
+  getSubscriptionByTelegramId(telegramUserId: string): Promise<Subscription | undefined>;
   createOrUpdateSubscription(subscription: InsertSubscription): Promise<Subscription>;
-  updateSubscriptionLicense(userId: string, licenseData: LicenseUpdateData): Promise<Subscription | undefined>;
+  activatePremiumByTelegram(telegramUserId: string, paymentData: TelegramPaymentData): Promise<Subscription | undefined>;
+  linkTelegramAccount(userId: string, telegramUserId: string): Promise<Subscription | undefined>;
   getUserPreferences(userId: string): Promise<UserPreferences | undefined>;
   createOrUpdateUserPreferences(preferences: InsertUserPreferences): Promise<UserPreferences>;
 }
@@ -49,14 +50,46 @@ export class DatabaseStorage implements IStorage {
     return subscription;
   }
 
-  async updateSubscriptionLicense(userId: string, licenseData: LicenseUpdateData): Promise<Subscription | undefined> {
+  async getSubscriptionByTelegramId(telegramUserId: string): Promise<Subscription | undefined> {
+    const [subscription] = await db
+      .select()
+      .from(subscriptions)
+      .where(eq(subscriptions.telegramUserId, telegramUserId));
+    return subscription;
+  }
+
+  async activatePremiumByTelegram(telegramUserId: string, paymentData: TelegramPaymentData): Promise<Subscription | undefined> {
     const [subscription] = await db
       .update(subscriptions)
       .set({
-        gumroadLicenseKey: licenseData.gumroadLicenseKey,
-        gumroadProductId: licenseData.gumroadProductId,
-        licenseEmail: licenseData.licenseEmail,
-        licenseValidatedAt: licenseData.licenseValidatedAt,
+        tier: "premium",
+        maxWpm: 1000,
+        telegramPaymentChargeId: paymentData.telegramPaymentChargeId,
+        paidAt: paymentData.paidAt,
+        updatedAt: new Date(),
+      })
+      .where(eq(subscriptions.telegramUserId, telegramUserId))
+      .returning();
+    return subscription;
+  }
+
+  async linkTelegramAccount(userId: string, telegramUserId: string): Promise<Subscription | undefined> {
+    // Check if telegram ID is already linked to another user
+    const existing = await this.getSubscriptionByTelegramId(telegramUserId);
+    if (existing && existing.userId !== userId) {
+      throw new Error("Telegram account already linked to another user");
+    }
+    
+    // Only allow linking if not already linked to a different telegram ID
+    const currentSub = await this.getSubscription(userId);
+    if (currentSub?.telegramUserId && currentSub.telegramUserId !== telegramUserId) {
+      throw new Error("Account already linked to a different Telegram account");
+    }
+    
+    const [subscription] = await db
+      .update(subscriptions)
+      .set({
+        telegramUserId,
         updatedAt: new Date(),
       })
       .where(eq(subscriptions.userId, userId))

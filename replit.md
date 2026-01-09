@@ -52,6 +52,26 @@ Preferred communication style: Simple, everyday language.
 - **Subscription tiers**: Free tier limits WPM to 350, premium unlocks higher speeds and advanced features
 - **ORP (Optimal Recognition Point)**: Words are centered at a calculated focal point to minimize eye movement during RSVP reading
 - **Gradual speed adaptation**: Reading starts at 60% target speed and ramps up to help the brain adapt
+- **Telegram Stars payments**: Premium subscriptions are purchased via Telegram Stars for easy payment in CIS countries
+
+### Telegram Payment Integration
+The app uses Telegram Stars for premium subscription payments with secure token-based account linking:
+1. User clicks "Buy Premium via Telegram" on settings page
+2. Frontend requests a signed, time-limited token from the server
+3. Opens Telegram bot with deep link containing the secure token
+4. Token is verified (signature + 1-hour expiration) before linking Telegram account
+5. Bot sends payment invoice for Stars
+6. Pre-checkout validates user and price match
+7. After payment, webhook activates premium subscription
+8. User returns to app with premium active
+
+**Security measures**:
+- Token-based linking prevents Telegram account hijacking
+- Unique constraint on telegram_user_id prevents multi-account abuse
+- Payment validation checks user match and price before accepting
+
+**Webhook endpoint**: `POST /api/telegram-webhook`
+**Setup script**: `npx tsx scripts/setup-telegram-webhook.ts`
 
 ## External Dependencies
 
@@ -62,7 +82,12 @@ Preferred communication style: Simple, everyday language.
 
 ### Environment Variables
 - `DATABASE_URL` - PostgreSQL connection string (required)
-- `SESSION_SECRET` - Secret key for session encryption (required, app will fail to start without it)
+- `SESSION_SECRET` - Secret key for session encryption (required)
+- `TELEGRAM_BOT_TOKEN` - Telegram Bot API token (required for payments)
+- `TELEGRAM_TOKEN_SECRET` - Dedicated secret for Telegram token signing (optional, falls back to SESSION_SECRET)
+- `TELEGRAM_STARS_PRICE` - Price in Telegram Stars (default: 100)
+- `VITE_TELEGRAM_BOT_USERNAME` - Bot username without @ (for deep links)
+- `VITE_APP_URL` - Public app URL (for webhook setup)
 
 ### Third-Party Libraries
 - bcrypt for password hashing
