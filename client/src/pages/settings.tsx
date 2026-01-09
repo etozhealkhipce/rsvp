@@ -8,8 +8,21 @@ import { ArrowLeft, Eye, EyeOff, User, Lock, Crown, Zap } from "lucide-react";
 import { SiTelegram } from "react-icons/si";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -23,19 +36,22 @@ const emailSchema = z.object({
   password: z.string().min(1, "Password is required to confirm changes"),
 });
 
-const passwordFormSchema = z.object({
-  currentPassword: z.string().min(1, "Current password is required"),
-  newPassword: z.string().min(6, "Password must be at least 6 characters"),
-  confirmPassword: z.string(),
-}).refine((data) => data.newPassword === data.confirmPassword, {
-  message: "Passwords don't match",
-  path: ["confirmPassword"],
-});
+const passwordFormSchema = z
+  .object({
+    currentPassword: z.string().min(1, "Current password is required"),
+    newPassword: z.string().min(6, "Password must be at least 6 characters"),
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: "Passwords don't match",
+    path: ["confirmPassword"],
+  });
 
 type EmailFormData = z.infer<typeof emailSchema>;
 type PasswordFormData = { currentPassword: string; newPassword: string };
 
-const TELEGRAM_BOT_USERNAME = import.meta.env.VITE_TELEGRAM_BOT_USERNAME || "default";
+const TELEGRAM_BOT_USERNAME =
+  import.meta.env.VITE_TELEGRAM_BOT_USERNAME || "default";
 
 export function SettingsPage() {
   const [, navigate] = useLocation();
@@ -45,9 +61,10 @@ export function SettingsPage() {
   const [isUpdatingEmail, setIsUpdatingEmail] = useState(false);
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
-  const { data: subscription, isLoading: isLoadingSubscription } = useQuery<Subscription>({
-    queryKey: ["/api/subscription"],
-  });
+  const { data: subscription, isLoading: isLoadingSubscription } =
+    useQuery<Subscription>({
+      queryKey: ["/api/subscription"],
+    });
 
   const emailForm = useForm<EmailFormData>({
     resolver: zodResolver(emailSchema),
@@ -68,10 +85,19 @@ export function SettingsPage() {
 
   const generateTokenMutation = useMutation({
     mutationFn: async () => {
-      const response = await apiRequest("POST", "/api/subscription/generate-telegram-token", {});
-      return await response.json() as { token: string; subscription: Subscription };
+      const response = await apiRequest(
+        "POST",
+        "/api/subscription/generate-telegram-token",
+        {},
+      );
+      return (await response.json()) as {
+        token: string;
+        subscription: Subscription;
+      };
     },
     onSuccess: (data) => {
+      console.log(TELEGRAM_BOT_USERNAME);
+      console.log(data);
       const telegramUrl = `https://t.me/${TELEGRAM_BOT_USERNAME}?start=${data.token}`;
       window.open(telegramUrl, "_blank");
       queryClient.invalidateQueries({ queryKey: ["/api/subscription"] });
@@ -94,7 +120,7 @@ export function SettingsPage() {
       });
       return;
     }
-    
+
     generateTokenMutation.mutate();
   };
 
@@ -110,7 +136,9 @@ export function SettingsPage() {
     } catch (error: any) {
       toast({
         title: "Failed to update email",
-        description: error?.message?.includes("401") ? "Invalid password" : "Something went wrong",
+        description: error?.message?.includes("401")
+          ? "Invalid password"
+          : "Something went wrong",
         variant: "destructive",
       });
     } finally {
@@ -118,7 +146,9 @@ export function SettingsPage() {
     }
   };
 
-  const onPasswordSubmit = async (data: PasswordFormData & { confirmPassword: string }) => {
+  const onPasswordSubmit = async (
+    data: PasswordFormData & { confirmPassword: string },
+  ) => {
     try {
       setIsUpdatingPassword(true);
       await apiRequest("PATCH", "/api/account/password", {
@@ -133,7 +163,9 @@ export function SettingsPage() {
     } catch (error: any) {
       toast({
         title: "Failed to update password",
-        description: error?.message?.includes("401") ? "Current password is incorrect" : "Something went wrong",
+        description: error?.message?.includes("401")
+          ? "Current password is incorrect"
+          : "Something went wrong",
         variant: "destructive",
       });
     } finally {
@@ -158,7 +190,12 @@ export function SettingsPage() {
     <div className="min-h-screen bg-background flex flex-col">
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur">
         <div className="container flex h-14 items-center justify-between gap-4 px-4 mx-auto max-w-4xl">
-          <Button variant="ghost" size="sm" onClick={() => navigate("/")} data-testid="button-back">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate("/")}
+            data-testid="button-back"
+          >
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
@@ -170,7 +207,9 @@ export function SettingsPage() {
       <main className="flex-1 container mx-auto max-w-2xl px-4 py-8">
         <div className="mb-8">
           <h2 className="text-2xl font-bold mb-2">Account Settings</h2>
-          <p className="text-muted-foreground">Manage your account information and security</p>
+          <p className="text-muted-foreground">
+            Manage your account information and security
+          </p>
         </div>
 
         <Card className="mb-6">
@@ -181,12 +220,16 @@ export function SettingsPage() {
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <span className="text-muted-foreground">Email:</span>
-                <span className="font-medium" data-testid="text-current-email">{user.email}</span>
+                <span className="font-medium" data-testid="text-current-email">
+                  {user.email}
+                </span>
               </div>
               {user.firstName && (
                 <div className="flex items-center gap-2">
                   <span className="text-muted-foreground">Name:</span>
-                  <span className="font-medium">{user.firstName} {user.lastName}</span>
+                  <span className="font-medium">
+                    {user.firstName} {user.lastName}
+                  </span>
                 </div>
               )}
             </div>
@@ -195,7 +238,10 @@ export function SettingsPage() {
 
         <Tabs defaultValue="subscription" className="space-y-6">
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="subscription" className="flex items-center gap-2">
+            <TabsTrigger
+              value="subscription"
+              className="flex items-center gap-2"
+            >
               <Crown className="h-4 w-4" />
               Subscription
             </TabsTrigger>
@@ -217,16 +263,17 @@ export function SettingsPage() {
                     <CardTitle className="flex items-center gap-2">
                       Subscription
                       {subscription?.tier === "premium" ? (
-                        <Badge className="bg-amber-500 text-white">Premium</Badge>
+                        <Badge className="bg-amber-500 text-white">
+                          Premium
+                        </Badge>
                       ) : (
                         <Badge variant="secondary">Free</Badge>
                       )}
                     </CardTitle>
                     <CardDescription>
-                      {subscription?.tier === "premium" 
+                      {subscription?.tier === "premium"
                         ? `Max speed: ${subscription.maxWpm} WPM`
-                        : "Upgrade to unlock faster reading speeds"
-                      }
+                        : "Upgrade to unlock faster reading speeds"}
                     </CardDescription>
                   </div>
                 </div>
@@ -242,11 +289,13 @@ export function SettingsPage() {
                         <span className="font-medium">Premium Active</span>
                       </div>
                       <p className="text-sm text-muted-foreground">
-                        You have access to reading speeds up to {subscription.maxWpm} WPM and all premium features.
+                        You have access to reading speeds up to{" "}
+                        {subscription.maxWpm} WPM and all premium features.
                       </p>
                       {subscription.paidAt && (
                         <p className="text-sm text-muted-foreground mt-2">
-                          Activated: {new Date(subscription.paidAt).toLocaleDateString()}
+                          Activated:{" "}
+                          {new Date(subscription.paidAt).toLocaleDateString()}
                         </p>
                       )}
                     </div>
@@ -271,27 +320,32 @@ export function SettingsPage() {
                         </h4>
                         <ul className="space-y-1 text-sm text-muted-foreground">
                           <li className="flex items-center gap-2">
-                            <Zap className="h-3 w-3 text-amber-500" /> Up to 1000 WPM
+                            <Zap className="h-3 w-3 text-amber-500" /> Up to
+                            1000 WPM
                           </li>
                           <li className="flex items-center gap-2">
-                            <Zap className="h-3 w-3 text-amber-500" /> All features unlocked
+                            <Zap className="h-3 w-3 text-amber-500" /> All
+                            features unlocked
                           </li>
                         </ul>
                       </div>
                     </div>
 
                     <div className="space-y-4">
-                      <Button 
+                      <Button
                         onClick={handleBuyPremium}
                         disabled={generateTokenMutation.isPending}
                         className="flex items-center gap-2 bg-[#0088cc] hover:bg-[#0077b5]"
                         data-testid="button-buy-premium"
                       >
                         <SiTelegram className="h-5 w-5" />
-                        {generateTokenMutation.isPending ? "Opening Telegram..." : "Buy Premium via Telegram"}
+                        {generateTokenMutation.isPending
+                          ? "Opening Telegram..."
+                          : "Buy Premium via Telegram"}
                       </Button>
                       <p className="text-xs text-muted-foreground">
-                        Pay with Telegram Stars - fast and secure payment through Telegram
+                        Pay with Telegram Stars - fast and secure payment
+                        through Telegram
                       </p>
                     </div>
                   </div>
@@ -308,7 +362,10 @@ export function SettingsPage() {
               </CardHeader>
               <CardContent>
                 <Form {...emailForm}>
-                  <form onSubmit={emailForm.handleSubmit(onEmailSubmit)} className="space-y-4">
+                  <form
+                    onSubmit={emailForm.handleSubmit(onEmailSubmit)}
+                    className="space-y-4"
+                  >
                     <FormField
                       control={emailForm.control}
                       name="newEmail"
@@ -368,7 +425,10 @@ export function SettingsPage() {
               </CardHeader>
               <CardContent>
                 <Form {...passwordForm}>
-                  <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)} className="space-y-4">
+                  <form
+                    onSubmit={passwordForm.handleSubmit(onPasswordSubmit)}
+                    className="space-y-4"
+                  >
                     <FormField
                       control={passwordForm.control}
                       name="currentPassword"
@@ -390,7 +450,11 @@ export function SettingsPage() {
                                 className="absolute right-0 top-0 h-full px-3"
                                 onClick={() => setShowPasswords(!showPasswords)}
                               >
-                                {showPasswords ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                {showPasswords ? (
+                                  <EyeOff className="h-4 w-4" />
+                                ) : (
+                                  <Eye className="h-4 w-4" />
+                                )}
                               </Button>
                             </div>
                           </FormControl>
