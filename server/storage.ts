@@ -9,9 +9,17 @@ import {
 import { db } from "./db";
 import { eq } from "drizzle-orm";
 
+export interface LicenseUpdateData {
+  gumroadLicenseKey: string | null;
+  gumroadProductId: string | null;
+  licenseEmail: string | null;
+  licenseValidatedAt: Date | null;
+}
+
 export interface IStorage {
   getSubscription(userId: string): Promise<Subscription | undefined>;
   createOrUpdateSubscription(subscription: InsertSubscription): Promise<Subscription>;
+  updateSubscriptionLicense(userId: string, licenseData: LicenseUpdateData): Promise<Subscription | undefined>;
   getUserPreferences(userId: string): Promise<UserPreferences | undefined>;
   createOrUpdateUserPreferences(preferences: InsertUserPreferences): Promise<UserPreferences>;
 }
@@ -37,6 +45,21 @@ export class DatabaseStorage implements IStorage {
           updatedAt: new Date(),
         },
       })
+      .returning();
+    return subscription;
+  }
+
+  async updateSubscriptionLicense(userId: string, licenseData: LicenseUpdateData): Promise<Subscription | undefined> {
+    const [subscription] = await db
+      .update(subscriptions)
+      .set({
+        gumroadLicenseKey: licenseData.gumroadLicenseKey,
+        gumroadProductId: licenseData.gumroadProductId,
+        licenseEmail: licenseData.licenseEmail,
+        licenseValidatedAt: licenseData.licenseValidatedAt,
+        updatedAt: new Date(),
+      })
+      .where(eq(subscriptions.userId, userId))
       .returning();
     return subscription;
   }

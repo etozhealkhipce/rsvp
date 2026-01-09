@@ -218,5 +218,97 @@ export async function registerRoutes(
     }
   });
 
+  // Gumroad license verification
+  app.post("/api/subscription/verify-license", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId!;
+      const { licenseKey } = req.body;
+
+      if (!licenseKey || typeof licenseKey !== "string") {
+        return res.status(400).json({ message: "License key is required" });
+      }
+
+      const productId = process.env.GUMROAD_PRODUCT_ID;
+      if (!productId) {
+        return res.status(500).json({ message: "Gumroad not configured" });
+      }
+
+      // Verify license with Gumroad API
+      const requestBody = new URLSearchParams();
+      requestBody.append("product_id", productId);
+      requestBody.append("license_key", licenseKey.trim());
+      requestBody.append("increment_uses_count", "false");
+
+      const gumroadResponse = await fetch("https://api.gumroad.com/v2/licenses/verify", {
+        method: "POST",
+        body: requestBody,
+      });
+
+      const gumroadData = await gumroadResponse.json();
+
+      if (!gumroadData.success) {
+        return res.status(400).json({ message: "Invalid license key" });
+      }
+
+      // Check if subscription is active (not refunded, disputed, or cancelled)
+      const purchase = gumroadData.purchase;
+      if (purchase.refunded || purchase.disputed) {
+        return res.status(400).json({ message: "This license has been refunded or disputed" });
+      }
+
+      if (purchase.subscription_cancelled_at || purchase.subscription_failed_at) {
+        return res.status(400).json({ message: "This subscription has ended" });
+      }
+
+      // Update subscription to premium
+      await storage.createOrUpdateSubscription({
+        userId,
+        tier: "premium",
+        maxWpm: 1000,
+      });
+
+      // Store license info and get updated subscription
+      const updatedSubscription = await storage.updateSubscriptionLicense(userId, {
+        gumroadLicenseKey: licenseKey.trim(),
+        gumroadProductId: productId,
+        licenseEmail: purchase.email,
+        licenseValidatedAt: new Date(),
+      });
+
+      res.json({
+        ...updatedSubscription,
+        message: "Premium subscription activated!",
+      });
+    } catch (error) {
+      console.error("Error verifying license:", error);
+      res.status(500).json({ message: "Failed to verify license" });
+    }
+  });
+
+  // Remove license / downgrade to free
+  app.post("/api/subscription/remove-license", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = req.session.userId!;
+
+      const subscription = await storage.createOrUpdateSubscription({
+        userId,
+        tier: "free",
+        maxWpm: 350,
+      });
+
+      await storage.updateSubscriptionLicense(userId, {
+        gumroadLicenseKey: null,
+        gumroadProductId: null,
+        licenseEmail: null,
+        licenseValidatedAt: null,
+      });
+
+      res.json({ ...subscription, message: "Subscription downgraded to free" });
+    } catch (error) {
+      console.error("Error removing license:", error);
+      res.status(500).json({ message: "Failed to remove license" });
+    }
+  });
+
   return httpServer;
 }

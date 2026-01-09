@@ -139,7 +139,7 @@ export function LoginPage() {
                             type="button"
                             variant="ghost"
                             size="icon"
-                            className="absolute! right-0 top-0 h-full px-3"
+                            className="absolute right-0 top-0 h-full px-3"
                             onClick={() => setShowPassword(!showPassword)}
                             data-testid="button-toggle-password"
                           >

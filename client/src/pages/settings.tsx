@@ -3,16 +3,19 @@ import { useLocation } from "wouter";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { ArrowLeft, Eye, EyeOff, User, Lock } from "lucide-react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { ArrowLeft, Eye, EyeOff, User, Lock, Crown, Zap, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import type { Subscription } from "@shared/schema";
 
 const emailSchema = z.object({
   newEmail: z.string().email("Invalid email address"),
@@ -28,8 +31,13 @@ const passwordFormSchema = z.object({
   path: ["confirmPassword"],
 });
 
+const licenseSchema = z.object({
+  licenseKey: z.string().min(1, "License key is required"),
+});
+
 type EmailFormData = z.infer<typeof emailSchema>;
 type PasswordFormData = { currentPassword: string; newPassword: string };
+type LicenseFormData = z.infer<typeof licenseSchema>;
 
 export function SettingsPage() {
   const [, navigate] = useLocation();
@@ -38,6 +46,53 @@ export function SettingsPage() {
   const [showPasswords, setShowPasswords] = useState(false);
   const [isUpdatingEmail, setIsUpdatingEmail] = useState(false);
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+
+  const { data: subscription, isLoading: isLoadingSubscription } = useQuery<Subscription>({
+    queryKey: ["/api/subscription"],
+  });
+
+  const verifyLicenseMutation = useMutation({
+    mutationFn: async (data: LicenseFormData) => {
+      const response = await apiRequest("POST", "/api/subscription/verify-license", data);
+      return response;
+    },
+    onSuccess: () => {
+      toast({
+        title: "Premium activated",
+        description: "Your license has been verified successfully!",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/subscription"] });
+      licenseForm.reset();
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Verification failed",
+        description: error?.message || "Invalid license key",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const removeLicenseMutation = useMutation({
+    mutationFn: async () => {
+      const response = await apiRequest("POST", "/api/subscription/remove-license", {});
+      return response;
+    },
+    onSuccess: () => {
+      toast({
+        title: "License removed",
+        description: "Your subscription has been downgraded to free.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/subscription"] });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Failed to remove license",
+        variant: "destructive",
+      });
+    },
+  });
 
   const emailForm = useForm<EmailFormData>({
     resolver: zodResolver(emailSchema),
@@ -53,6 +108,13 @@ export function SettingsPage() {
       currentPassword: "",
       newPassword: "",
       confirmPassword: "",
+    },
+  });
+
+  const licenseForm = useForm<LicenseFormData>({
+    resolver: zodResolver(licenseSchema),
+    defaultValues: {
+      licenseKey: "",
     },
   });
 
@@ -151,17 +213,154 @@ export function SettingsPage() {
           </CardContent>
         </Card>
 
-        <Tabs defaultValue="email" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-2">
+        <Tabs defaultValue="subscription" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="subscription" className="flex items-center gap-2">
+              <Crown className="h-4 w-4" />
+              Subscription
+            </TabsTrigger>
             <TabsTrigger value="email" className="flex items-center gap-2">
               <User className="h-4 w-4" />
-              Change Email
+              Email
             </TabsTrigger>
             <TabsTrigger value="password" className="flex items-center gap-2">
               <Lock className="h-4 w-4" />
-              Change Password
+              Password
             </TabsTrigger>
           </TabsList>
+
+          <TabsContent value="subscription">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      Subscription
+                      {subscription?.tier === "premium" ? (
+                        <Badge className="bg-amber-500 text-white">Premium</Badge>
+                      ) : (
+                        <Badge variant="secondary">Free</Badge>
+                      )}
+                    </CardTitle>
+                    <CardDescription>
+                      {subscription?.tier === "premium" 
+                        ? `Max speed: ${subscription.maxWpm} WPM`
+                        : "Upgrade to unlock faster reading speeds"
+                      }
+                    </CardDescription>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {isLoadingSubscription ? (
+                  <div className="text-muted-foreground">Loading...</div>
+                ) : subscription?.tier === "premium" ? (
+                  <div className="space-y-4">
+                    <div className="p-4 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Crown className="h-5 w-5 text-amber-500" />
+                        <span className="font-medium">Premium Active</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground">
+                        You have access to reading speeds up to {subscription.maxWpm} WPM and all premium features.
+                      </p>
+                      {subscription.licenseEmail && (
+                        <p className="text-sm text-muted-foreground mt-2">
+                          License email: {subscription.licenseEmail}
+                        </p>
+                      )}
+                    </div>
+                    <Button
+                      variant="outline"
+                      onClick={() => removeLicenseMutation.mutate()}
+                      disabled={removeLicenseMutation.isPending}
+                      data-testid="button-remove-license"
+                    >
+                      {removeLicenseMutation.isPending ? "Removing..." : "Remove License"}
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <div className="p-4 rounded-lg border">
+                        <h4 className="font-medium mb-2">Free</h4>
+                        <ul className="space-y-1 text-sm text-muted-foreground">
+                          <li className="flex items-center gap-2">
+                            <Zap className="h-3 w-3" /> Up to 350 WPM
+                          </li>
+                          <li className="flex items-center gap-2">
+                            <Zap className="h-3 w-3" /> Basic RSVP features
+                          </li>
+                        </ul>
+                      </div>
+                      <div className="p-4 rounded-lg border border-amber-500/50 bg-amber-500/5">
+                        <h4 className="font-medium mb-2 flex items-center gap-2">
+                          Premium <Crown className="h-4 w-4 text-amber-500" />
+                        </h4>
+                        <ul className="space-y-1 text-sm text-muted-foreground">
+                          <li className="flex items-center gap-2">
+                            <Zap className="h-3 w-3 text-amber-500" /> Up to 1000 WPM
+                          </li>
+                          <li className="flex items-center gap-2">
+                            <Zap className="h-3 w-3 text-amber-500" /> All features unlocked
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <div>
+                        <Button asChild variant="default">
+                          <a 
+                            href="https://gumroad.com" 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2"
+                            data-testid="link-buy-premium"
+                          >
+                            Buy Premium on Gumroad
+                            <ExternalLink className="h-4 w-4" />
+                          </a>
+                        </Button>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          After purchase, enter your license key below
+                        </p>
+                      </div>
+
+                      <Form {...licenseForm}>
+                        <form onSubmit={licenseForm.handleSubmit((data) => verifyLicenseMutation.mutate(data))} className="space-y-4">
+                          <FormField
+                            control={licenseForm.control}
+                            name="licenseKey"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>License Key</FormLabel>
+                                <FormControl>
+                                  <Input
+                                    placeholder="XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX"
+                                    data-testid="input-license-key"
+                                    {...field}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <Button
+                            type="submit"
+                            disabled={verifyLicenseMutation.isPending}
+                            data-testid="button-verify-license"
+                          >
+                            {verifyLicenseMutation.isPending ? "Verifying..." : "Activate License"}
+                          </Button>
+                        </form>
+                      </Form>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           <TabsContent value="email">
             <Card>

@@ -10,6 +10,10 @@ export const subscriptions = pgTable("subscriptions", {
   userId: varchar("user_id").notNull().unique(),
   tier: text("tier").notNull().default("free"),
   maxWpm: integer("max_wpm").notNull().default(350),
+  gumroadLicenseKey: text("gumroad_license_key"),
+  gumroadProductId: text("gumroad_product_id"),
+  licenseEmail: text("license_email"),
+  licenseValidatedAt: timestamp("license_validated_at"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
