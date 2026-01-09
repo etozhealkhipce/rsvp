@@ -313,8 +313,9 @@ export async function registerRoutes(
       // Log incoming webhook for debugging
       console.log(
         "Telegram webhook received:",
-        JSON.stringify(update).substring(0, 200),
+        JSON.stringify(update).substring(0, 500),
       );
+      console.log("Update type:", update.message ? "message" : update.pre_checkout_query ? "pre_checkout" : update.successful_payment ? "payment" : "unknown");
 
       // Verify webhook authenticity using Telegram's secret_token header
       if (webhookSecret) {
@@ -329,7 +330,11 @@ export async function registerRoutes(
       }
 
       // Expire old pending payments periodically
-      await storage.expireOldPayments();
+      try {
+        await storage.expireOldPayments();
+      } catch (expireError) {
+        console.error("Error expiring old payments (non-fatal):", expireError);
+      }
 
       // Handle /history command - show payment history
       if (update.message?.text === "/history") {
@@ -358,9 +363,22 @@ export async function registerRoutes(
           );
 
           // Look up token in database
-          const linkToken = await storage.getTelegramLinkToken(tokenId);
+          let linkToken;
+          try {
+            linkToken = await storage.getTelegramLinkToken(tokenId);
+            console.log("Token lookup result:", linkToken ? "found" : "not found");
+          } catch (tokenError) {
+            console.error("Error looking up token:", tokenError);
+            await sendTelegramMessage(
+              botToken,
+              chatId,
+              "Error processing your request. Please try again.",
+            );
+            return res.json({ ok: true });
+          }
 
           if (!linkToken) {
+            console.log("Token not found or expired, sending error message");
             await sendTelegramMessage(
               botToken,
               chatId,
@@ -558,15 +576,26 @@ async function sendTelegramMessage(
   chatId: number,
   text: string,
 ) {
-  await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      chat_id: chatId,
-      text,
-      parse_mode: "Markdown",
-    }),
-  });
+  try {
+    console.log("Sending Telegram message to chat:", chatId);
+    const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        parse_mode: "Markdown",
+      }),
+    });
+    const result = await response.json();
+    if (!result.ok) {
+      console.error("Failed to send Telegram message:", result);
+    } else {
+      console.log("Telegram message sent successfully");
+    }
+  } catch (e) {
+    console.error("Error sending Telegram message:", e);
+  }
 }
 
 async function answerPreCheckout(
