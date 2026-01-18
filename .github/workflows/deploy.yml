@@ -73,7 +73,7 @@ jobs:
 
             # Создать app secrets
             if [ -n "$SECRET_DATA" ]; then
-              for APP in "rsvp" "rsvp-db"; do
+              for APP in "rsvp-app" "rsvp-db"; do
                 cat << EOF | kubectl apply -f -
             apiVersion: v1
             kind: Secret
@@ -86,10 +86,6 @@ jobs:
             EOF
                 echo "SECRETS CREATED FOR ${APP}"
               done
-              echo "Verifying secrets exist..."
-              kubectl get secrets -n ${{ env.NAMESPACE }} | grep -E "(rsvp|rsvp-db)-secrets" || echo "WARNING: Secrets not found after creation!"
-            else
-              echo "ERROR: SECRET_DATA is empty, cannot create secrets!"
             fi
 
             # секрет создаем
@@ -118,17 +114,13 @@ jobs:
             kubectl wait --for=condition=ready pod -l app=rsvp-db -n ${{ env.NAMESPACE }} --timeout=300s
 
             echo "2/2 DEPLOYING APP (Backend + Frontend)..."
-            echo "Checking secrets before helm deploy..."
-            kubectl get secrets -n ${{ env.NAMESPACE }} | grep -E "(rsvp|rsvp-db)-secrets" || echo "WARNING: Secrets missing before helm deploy!"
-            helm upgrade --install rsvp . \
+            helm upgrade --install rsvp-app . \
               --namespace ${{ env.NAMESPACE }} \
               -f /tmp/deploy-rsvp/consumer/deploy/values.yml \
               --set app.image.tag=${TAG} \
               --wait --timeout 5m
-            echo "Checking secrets after helm deploy..."
-            kubectl get secrets -n ${{ env.NAMESPACE }} | grep -E "(rsvp|rsvp-db)-secrets" || echo "WARNING: Secrets missing after helm deploy!"
 
             echo "COMPLETE!"
-            kubectl get pods -n ${{ env.NAMESPACE }} -l 'app in (rsvp,rsvp-db)'
+            kubectl get pods -n ${{ env.NAMESPACE }} -l 'app in (rsvp-app,rsvp-db)'
 
             rm -rf /tmp/deploy-rsvp
