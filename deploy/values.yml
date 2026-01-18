@@ -21,7 +21,7 @@ app:
         - |
           apk add --no-cache postgresql-client
           echo "WAITING FOR DATABASE..."
-          until pg_isready -h rsvp-db -p 5432 -U "${PGUSER}" 2>/dev/null; do
+          until pg_isready -h "${PGHOST}" -p "${PGPORT}" -U "${PGUSER}" 2>/dev/null; do
             echo "DATABASE UNAVAILABLE - SLEEPING"
             sleep 2
           done
