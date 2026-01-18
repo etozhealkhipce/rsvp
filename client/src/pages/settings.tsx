@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { motion } from "framer-motion";
-import { ArrowLeft, Eye, EyeOff, User, Lock, Crown, Zap, Sparkles, Check, X } from "lucide-react";
+import { ArrowLeft, User, Lock, Crown, Sparkles, Check, X } from "lucide-react";
 import { SiTelegram } from "react-icons/si";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -72,7 +72,6 @@ export function SettingsPage() {
   const [, navigate] = useLocation();
   const { user, isLoading } = useAuth();
   const { toast } = useToast();
-  const [showPasswords, setShowPasswords] = useState(false);
   const [isUpdatingEmail, setIsUpdatingEmail] = useState(false);
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
@@ -224,8 +223,8 @@ export function SettingsPage() {
 
       <main className="flex-1 container mx-auto max-w-3xl px-6 py-10 relative">
         <FloatingElementsLight />
-        
-        <motion.div 
+
+        <motion.div
           className="mb-10 relative z-10"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -253,7 +252,10 @@ export function SettingsPage() {
                 <div className="space-y-3">
                   <div className="flex items-center gap-3">
                     <span className="text-muted-foreground">Email:</span>
-                    <span className="font-semibold" data-testid="text-current-email">
+                    <span
+                      className="font-semibold"
+                      data-testid="text-current-email"
+                    >
                       {user.email}
                     </span>
                   </div>
@@ -280,15 +282,15 @@ export function SettingsPage() {
                   <Crown className="h-4 w-4" />
                   <span className="hidden sm:inline">Subscription</span>
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="email" 
+                <TabsTrigger
+                  value="email"
                   className="flex items-center gap-2 rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm"
                 >
                   <User className="h-4 w-4" />
                   <span className="hidden sm:inline">Email</span>
                 </TabsTrigger>
-                <TabsTrigger 
-                  value="password" 
+                <TabsTrigger
+                  value="password"
                   className="flex items-center gap-2 rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-sm"
                 >
                   <Lock className="h-4 w-4" />
@@ -309,7 +311,9 @@ export function SettingsPage() {
                               Premium
                             </Badge>
                           ) : (
-                            <Badge variant="secondary" className="px-3 py-1">Free</Badge>
+                            <Badge variant="secondary" className="px-3 py-1">
+                              Free
+                            </Badge>
                           )}
                         </CardTitle>
                         <CardDescription className="mt-2">
@@ -324,7 +328,7 @@ export function SettingsPage() {
                     {isLoadingSubscription ? (
                       <div className="text-muted-foreground">Loading...</div>
                     ) : subscription?.tier === "premium" ? (
-                      <motion.div 
+                      <motion.div
                         className="p-6 rounded-2xl bg-gradient-to-br from-amber-500/10 via-orange-500/10 to-pink-500/10 border border-amber-500/20"
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
@@ -336,15 +340,21 @@ export function SettingsPage() {
                           >
                             <Crown className="h-6 w-6 text-white" />
                           </motion.div>
-                          <span className="font-bold text-xl">Premium Active</span>
+                          <span className="font-bold text-xl">
+                            Premium Active
+                          </span>
                         </div>
                         <p className="text-muted-foreground">
                           You have access to reading speeds up to{" "}
-                          <span className="font-semibold text-foreground">{subscription.maxWpm} WPM</span> and all premium features.
+                          <span className="font-semibold text-foreground">
+                            {subscription.maxWpm} WPM
+                          </span>{" "}
+                          and all premium features.
                         </p>
                         {subscription.paidAt && (
                           <p className="text-sm text-muted-foreground mt-3">
-                            Activated: {new Date(subscription.paidAt).toLocaleDateString()}
+                            Activated:{" "}
+                            {new Date(subscription.paidAt).toLocaleDateString()}
                           </p>
                         )}
                       </motion.div>
@@ -378,7 +388,7 @@ export function SettingsPage() {
                             <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 via-orange-500/5 to-pink-500/5" />
                             <div className="relative">
                               <h4 className="font-bold text-lg mb-4 flex items-center gap-2">
-                                Premium 
+                                Premium
                                 <Sparkles className="h-5 w-5 text-amber-500" />
                               </h4>
                               <ul className="space-y-3 text-sm">
@@ -418,7 +428,8 @@ export function SettingsPage() {
                               : "Buy Premium via Telegram"}
                           </Button>
                           <p className="text-sm text-muted-foreground">
-                            Pay with Telegram Stars - fast and secure payment through Telegram
+                            Pay with Telegram Stars - fast and secure payment
+                            through Telegram
                           </p>
                         </div>
                       </div>
@@ -512,28 +523,12 @@ export function SettingsPage() {
                             <FormItem>
                               <FormLabel>Current Password</FormLabel>
                               <FormControl>
-                                <div className="relative">
-                                  <Input
-                                    type={showPasswords ? "text" : "password"}
-                                    placeholder="Enter current password"
-                                    className="h-12 rounded-xl pr-12"
-                                    data-testid="input-current-password"
-                                    {...field}
-                                  />
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="icon"
-                                    className="absolute right-0 top-0 h-full px-4 rounded-r-xl"
-                                    onClick={() => setShowPasswords(!showPasswords)}
-                                  >
-                                    {showPasswords ? (
-                                      <EyeOff className="h-4 w-4" />
-                                    ) : (
-                                      <Eye className="h-4 w-4" />
-                                    )}
-                                  </Button>
-                                </div>
+                                <Input
+                                  type="password"
+                                  placeholder="Enter current password"
+                                  data-testid="input-current-password"
+                                  {...field}
+                                />
                               </FormControl>
                               <FormMessage />
                             </FormItem>
@@ -548,9 +543,8 @@ export function SettingsPage() {
                               <FormLabel>New Password</FormLabel>
                               <FormControl>
                                 <Input
-                                  type={showPasswords ? "text" : "password"}
+                                  type="password"
                                   placeholder="At least 6 characters"
-                                  className="h-12 rounded-xl"
                                   data-testid="input-new-password"
                                   {...field}
                                 />
@@ -568,9 +562,8 @@ export function SettingsPage() {
                               <FormLabel>Confirm New Password</FormLabel>
                               <FormControl>
                                 <Input
-                                  type={showPasswords ? "text" : "password"}
+                                  type="password"
                                   placeholder="Repeat new password"
-                                  className="h-12 rounded-xl"
                                   data-testid="input-confirm-new-password"
                                   {...field}
                                 />
@@ -586,7 +579,9 @@ export function SettingsPage() {
                           className="rounded-full h-12 px-8"
                           data-testid="button-update-password"
                         >
-                          {isUpdatingPassword ? "Updating..." : "Update Password"}
+                          {isUpdatingPassword
+                            ? "Updating..."
+                            : "Update Password"}
                         </Button>
                       </form>
                     </Form>

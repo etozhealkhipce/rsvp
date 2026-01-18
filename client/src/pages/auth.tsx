@@ -82,15 +82,15 @@ export function LoginPage() {
     <div className="min-h-screen bg-background flex flex-col relative overflow-hidden">
       <div className="absolute inset-0 gradient-hero" />
       <FloatingElementsLight />
-      
+
       <header className="sticky top-0 z-50 glass">
         <div className="container flex h-20 items-center justify-between px-6 mx-auto max-w-7xl">
-          <motion.div 
+          <motion.div
             className="flex items-center gap-3 cursor-pointer"
             onClick={() => navigate("/")}
             whileHover={{ scale: 1.02 }}
           >
-            <motion.div 
+            <motion.div
               className="flex h-10 w-10 items-center justify-center rounded-2xl gradient-primary glow-primary"
               whileHover={{ scale: 1.1, rotate: 5 }}
             >
@@ -158,29 +158,12 @@ export function LoginPage() {
                       <FormItem>
                         <FormLabel>Password</FormLabel>
                         <FormControl>
-                          <div className="relative">
-                            <Input
-                              type={showPassword ? "text" : "password"}
-                              placeholder="Enter your password"
-                              className="h-12 rounded-xl pr-12"
-                              data-testid="input-password"
-                              {...field}
-                            />
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="absolute right-0 top-0 h-full px-4 rounded-r-xl"
-                              onClick={() => setShowPassword(!showPassword)}
-                              data-testid="button-toggle-password"
-                            >
-                              {showPassword ? (
-                                <EyeOff className="h-4 w-4" />
-                              ) : (
-                                <Eye className="h-4 w-4" />
-                              )}
-                            </Button>
-                          </div>
+                          <Input
+                            type="password"
+                            placeholder="Enter your password"
+                            data-testid="input-password"
+                            {...field}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -260,15 +243,15 @@ export function RegisterPage() {
     <div className="min-h-screen bg-background flex flex-col relative overflow-hidden">
       <div className="absolute inset-0 gradient-hero" />
       <FloatingElementsLight />
-      
+
       <header className="sticky top-0 z-50 glass">
         <div className="container flex h-20 items-center justify-between px-6 mx-auto max-w-7xl">
-          <motion.div 
+          <motion.div
             className="flex items-center gap-3 cursor-pointer"
             onClick={() => navigate("/")}
             whileHover={{ scale: 1.02 }}
           >
-            <motion.div 
+            <motion.div
               className="flex h-10 w-10 items-center justify-center rounded-2xl gradient-primary glow-primary"
               whileHover={{ scale: 1.1, rotate: 5 }}
             >
@@ -298,7 +281,9 @@ export function RegisterPage() {
                   <BookOpen className="h-8 w-8 text-white" />
                 </div>
               </motion.div>
-              <CardTitle className="text-3xl font-bold">Create an account</CardTitle>
+              <CardTitle className="text-3xl font-bold">
+                Create an account
+              </CardTitle>
               <CardDescription className="text-base mt-2">
                 Start speed reading today
               </CardDescription>
@@ -376,29 +361,12 @@ export function RegisterPage() {
                       <FormItem>
                         <FormLabel>Password</FormLabel>
                         <FormControl>
-                          <div className="relative">
-                            <Input
-                              type={showPassword ? "text" : "password"}
-                              placeholder="At least 6 characters"
-                              className="h-12 rounded-xl pr-12"
-                              data-testid="input-password"
-                              {...field}
-                            />
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="absolute right-0 top-0 h-full px-4 rounded-r-xl"
-                              onClick={() => setShowPassword(!showPassword)}
-                              data-testid="button-toggle-password"
-                            >
-                              {showPassword ? (
-                                <EyeOff className="h-4 w-4" />
-                              ) : (
-                                <Eye className="h-4 w-4" />
-                              )}
-                            </Button>
-                          </div>
+                          <Input
+                            type={showPassword ? "text" : "password"}
+                            placeholder="At least 6 characters"
+                            data-testid="input-password"
+                            {...field}
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
