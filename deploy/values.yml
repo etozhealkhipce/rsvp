@@ -1,5 +1,5 @@
 app:
-  name: rsvp
+  name: rsvp-app
   namespace: sskd
   replicas: 1
   port: 5000
