@@ -12,7 +12,11 @@ app:
   imagePullSecrets: []
 
   env:
-    POSTGRES_DB: rsvp_db
+    POSTGRES_DB:
+      valueFrom:
+        secretKeyRef:
+          name: rsvp-db-secrets
+          key: PGDATABASE
     POSTGRES_USER:
       valueFrom:
         secretKeyRef:
@@ -23,9 +27,6 @@ app:
         secretKeyRef:
           name: rsvp-db-secrets
           key: PGPASSWORD
-  envFrom:
-    - secretRef:
-        name: rsvp-db-secrets
 
   livenessProbe: null
   readinessProbe: null

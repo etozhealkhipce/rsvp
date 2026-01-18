@@ -32,6 +32,9 @@ app:
   env:
     NODE_ENV: production
     PORT: "5000"
+  envFrom:
+    - secretRef:
+        name: rsvp-app-secrets
 
   resources:
     requests:
