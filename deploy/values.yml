@@ -1,7 +1,7 @@
 app:
   name: rsvp
   namespace: sskd
-  replicas: 2
+  replicas: 1
   port: 5000
   healthPath: /health
 
