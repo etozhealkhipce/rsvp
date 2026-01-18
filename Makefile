@@ -41,13 +41,13 @@ shell-backend: ## Shell into backend container
 	docker-compose exec backend sh
 
 shell-db: ## Shell into database container
-	docker-compose exec database psql -U $${POSTGRES_USER:-rsvp_admin} -d rsvp_db
+	docker-compose exec database psql -U $${PGUSER} -d rsvp_db
 
 health: ## Check health of all services
 	@echo "Backend + Frontend:"
 	@curl -f http://localhost/health || echo "Backend: DOWN"
 	@echo "\nDatabase:"
-	@docker-compose exec -T database pg_isready -U $${POSTGRES_USER:-rsvp_admin} || echo "Database: DOWN"
+	@docker-compose exec -T database pg_isready -U $${PGUSER} || echo "Database: DOWN"
 
 migrate: ## Run database migrations
 	docker-compose exec backend npx drizzle-kit push
