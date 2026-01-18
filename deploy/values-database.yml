@@ -13,6 +13,19 @@ app:
 
   env:
     POSTGRES_DB: rsvp_db
+    POSTGRES_USER:
+      valueFrom:
+        secretKeyRef:
+          name: rsvp-db-secrets
+          key: PGUSER
+    POSTGRES_PASSWORD:
+      valueFrom:
+        secretKeyRef:
+          name: rsvp-db-secrets
+          key: PGPASSWORD
+  envFrom:
+    - secretRef:
+        name: rsvp-db-secrets
 
   livenessProbe: null
   readinessProbe: null
