@@ -84,3 +84,15 @@ export const insertTelegramPaymentSchema = createInsertSchema(telegramPayments).
 
 export type InsertTelegramPayment = z.infer<typeof insertTelegramPaymentSchema>;
 export type TelegramPayment = typeof telegramPayments.$inferSelect;
+
+// Default books - sample texts available to all users for onboarding
+export const defaultBooks = pgTable("default_books", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  content: text("content").notNull(),
+  wordCount: integer("word_count").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export type DefaultBook = typeof defaultBooks.$inferSelect;
+

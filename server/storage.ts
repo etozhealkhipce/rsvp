@@ -3,13 +3,15 @@ import {
   userPreferences,
   telegramLinkTokens,
   telegramPayments,
+  defaultBooks,
   type Subscription, 
   type InsertSubscription,
   type UserPreferences,
   type InsertUserPreferences,
   type TelegramLinkToken,
   type TelegramPayment,
-  type InsertTelegramPayment
+  type InsertTelegramPayment,
+  type DefaultBook
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, lt, ne } from "drizzle-orm";
@@ -40,6 +42,8 @@ export interface IStorage {
   markPaymentExpired(paymentId: string): Promise<void>;
   expireOldPayments(): Promise<void>;
   getPaymentHistory(telegramUserId: string): Promise<TelegramPayment[]>;
+  // Default books
+  getDefaultBooks(): Promise<DefaultBook[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -265,6 +269,10 @@ export class DatabaseStorage implements IStorage {
       .where(eq(telegramPayments.telegramUserId, telegramUserId))
       .orderBy(desc(telegramPayments.createdAt))
       .limit(10);
+  }
+
+  async getDefaultBooks(): Promise<DefaultBook[]> {
+    return await db.select().from(defaultBooks);
   }
 }
 

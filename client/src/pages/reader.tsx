@@ -1,7 +1,18 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useLocation, useRoute } from "wouter";
+import { useLocation, useParams, useRoute } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Play, Pause, RotateCcw, SkipBack, SkipForward } from "lucide-react";
+import { useNextStep } from "nextstepjs";
+import {
+  Play,
+  Pause,
+  RotateCcw,
+  ChevronLeft,
+  ChevronRight,
+  Settings2,
+  ArrowLeft,
+  SkipBack,
+  SkipForward
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -12,6 +23,7 @@ import { getText, updateProgress, saveText, type StoredText } from "@/lib/indexe
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { UserPreferences, Subscription } from "@shared/schema";
+// Redundant navigate import removed
 
 interface RSVPSettings {
   wpm: number;
@@ -21,10 +33,21 @@ interface RSVPSettings {
 }
 
 export function ReaderPage() {
-  const [, navigate] = useLocation();
-  const [, params] = useRoute("/read/:id");
+  const { id } = useParams();
+  const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const { currentTour, currentStep, setCurrentStep } = useNextStep();
+
+  const handleOnboardingClick = (action: 'play-pause' | 'skip-back' | 'skip-forward' | 'reset' | 'settings') => {
+    if (currentTour === "onboardingTour" && currentStep !== null) {
+      if (action === 'play-pause' && currentStep === 3) setCurrentStep(4);
+      if (action === 'skip-back' && currentStep === 4) setCurrentStep(5);
+      if (action === 'skip-forward' && currentStep === 5) setCurrentStep(6);
+      if (action === 'reset' && currentStep === 6) setCurrentStep(7);
+      if (action === 'settings' && currentStep === 7) setCurrentStep(8);
+    }
+  };
   
   const [text, setText] = useState<StoredText | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -41,8 +64,8 @@ export function ReaderPage() {
   const [currentWpm, setCurrentWpm] = useState(settings.wpm);
   const [startTime, setStartTime] = useState<number | null>(null);
   
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const rampUpRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<number | null>(null);
+  const rampUpRef = useRef<number | null>(null);
   const settingsInitialized = useRef(false);
   const currentWpmRef = useRef(settings.wpm);
 
@@ -100,14 +123,14 @@ export function ReaderPage() {
 
   useEffect(() => {
     const loadText = async () => {
-      if (!params?.id) {
-        navigate("/");
+      if (!id) {
+        setLocation("/");
         return;
       }
 
       try {
         setIsLoading(true);
-        const loadedText = await getText(params.id);
+        const loadedText = await getText(id);
         
         if (!loadedText) {
           toast({
@@ -115,7 +138,7 @@ export function ReaderPage() {
             description: "The requested text could not be found.",
             variant: "destructive",
           });
-          navigate("/");
+          setLocation("/");
           return;
         }
 
@@ -135,14 +158,14 @@ export function ReaderPage() {
           description: "Failed to load the text.",
           variant: "destructive",
         });
-        navigate("/");
+        setLocation("/");
       } finally {
         setIsLoading(false);
       }
     };
 
     loadText();
-  }, [params?.id, navigate, toast]);
+  }, [id, setLocation, toast]);
 
   const getDelayForWord = useCallback((word: string, wpm: number) => {
     let baseDelay = 60000 / wpm;
@@ -194,7 +217,7 @@ export function ReaderPage() {
           }
           return newIndex;
         });
-      }, delay);
+      }, delay) as any;
     };
 
     scheduleNext();
@@ -221,7 +244,7 @@ export function ReaderPage() {
         setCurrentWpm(newWpm);
         
         if (progress < 1) {
-          rampUpRef.current = setTimeout(updateWpm, 100);
+          rampUpRef.current = setTimeout(updateWpm, 100) as any;
         }
       };
       
@@ -257,6 +280,7 @@ export function ReaderPage() {
       }
     }
     setIsPlaying(!isPlaying);
+    handleOnboardingClick('play-pause');
   };
 
   const handleReset = () => {
@@ -275,6 +299,7 @@ export function ReaderPage() {
     if (text) {
       updateProgress(text.id, 0);
     }
+    handleOnboardingClick('reset');
   };
 
   const handleSkipBack = () => {
@@ -283,6 +308,7 @@ export function ReaderPage() {
     if (text) {
       updateProgress(text.id, newIndex);
     }
+    handleOnboardingClick('skip-back');
   };
 
   const handleSkipForward = () => {
@@ -291,6 +317,7 @@ export function ReaderPage() {
     if (text) {
       updateProgress(text.id, newIndex);
     }
+    handleOnboardingClick('skip-forward');
   };
 
   const handleSettingsChange = async (newSettings: RSVPSettings) => {
@@ -359,7 +386,7 @@ export function ReaderPage() {
     <div className="min-h-screen bg-background flex flex-col">
       <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container flex h-14 items-center justify-between gap-4 px-4 mx-auto max-w-4xl">
-          <Button variant="ghost" size="sm" onClick={() => navigate("/")} data-testid="button-back">
+          <Button variant="ghost" size="sm" onClick={() => setLocation("/")} data-testid="button-back">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back
           </Button>
@@ -370,12 +397,14 @@ export function ReaderPage() {
           
           <div className="flex items-center gap-1">
             <ThemeToggle />
-            <RSVPSettingsSheet
-              settings={settings}
-              onSettingsChange={handleSettingsChange}
-              maxWpm={maxWpm}
-              isPremium={isPremium}
-            />
+            <div id="onboarding-settings">
+              <RSVPSettingsSheet
+                settings={settings}
+                onSettingsChange={handleSettingsChange}
+                maxWpm={maxWpm}
+                isPremium={isPremium}
+              />
+            </div>
           </div>
         </div>
       </header>
@@ -411,40 +440,46 @@ export function ReaderPage() {
               size="icon"
               onClick={handleReset}
               data-testid="button-reset"
+              id="onboarding-reset"
             >
               <RotateCcw className="h-4 w-4" />
             </Button>
             
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleSkipBack}
-              data-testid="button-skip-back"
-            >
-              <SkipBack className="h-4 w-4" />
-            </Button>
-            
-            <Button
-              size="icon"
-              className="h-14 w-14 rounded-full"
-              onClick={handlePlayPause}
-              data-testid="button-play-pause"
-            >
-              {isPlaying ? (
-                <Pause className="h-6 w-6" />
-              ) : (
-                <Play className="h-6 w-6 ml-0.5" />
-              )}
-            </Button>
-            
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleSkipForward}
-              data-testid="button-skip-forward"
-            >
-              <SkipForward className="h-4 w-4" />
-            </Button>
+            <div id="onboarding-navigation-controls" className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleSkipBack}
+                data-testid="button-skip-back"
+                id="onboarding-skip-back"
+              >
+                <SkipBack className="h-4 w-4" />
+              </Button>
+              
+              <Button
+                onClick={handlePlayPause}
+                className="h-14 w-14 rounded-full gradient-primary border-0 text-white shadow-lg glow-hover transition-all"
+                id="onboarding-play-pause"
+                size="icon"
+                data-testid="button-play-pause"
+              >
+                {isPlaying ? (
+                  <Pause className="h-6 w-6" />
+                ) : (
+                  <Play className="h-6 w-6 ml-0.5" />
+                )}
+              </Button>
+              
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleSkipForward}
+                data-testid="button-skip-forward"
+                id="onboarding-skip-forward"
+              >
+                <SkipForward className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
           
           <p className="text-center text-xs text-muted-foreground mt-4">

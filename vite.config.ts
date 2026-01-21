@@ -9,6 +9,8 @@ export default defineConfig({
       "@": path.resolve(import.meta.dirname, "client", "src"),
       "@shared": path.resolve(import.meta.dirname, "shared"),
       "@assets": path.resolve(import.meta.dirname, "attached_assets"),
+      // Mock Next.js navigation imports for nextstepjs
+      "next/navigation": path.resolve(import.meta.dirname, "client", "src", "mocks", "next-navigation.ts"),
     },
   },
   root: path.resolve(import.meta.dirname, "client"),
@@ -22,4 +24,8 @@ export default defineConfig({
       deny: ["**/.*"],
     },
   },
+  ssr: {
+    noExternal: ["nextstepjs", "motion"],
+  },
 });
+

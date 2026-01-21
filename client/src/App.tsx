@@ -1,6 +1,7 @@
 import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
+import { NextStepProvider, NextStepReact } from "nextstepjs";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ThemeProvider } from "@/lib/theme-provider";
@@ -11,6 +12,8 @@ import { ReaderPage } from "@/pages/reader";
 import { LoginPage, RegisterPage } from "@/pages/auth";
 import { SettingsPage } from "@/pages/settings";
 import NotFound from "@/pages/not-found";
+import { onboardingSteps } from "@/lib/onboarding-steps";
+import { OnboardingCard } from "@/components/onboarding-card";
 import type { Subscription } from "@shared/schema";
 
 function useSubscription(isAuthenticated: boolean) {
@@ -75,7 +78,17 @@ function App() {
     <ThemeProvider defaultTheme="system" storageKey="rsvp-reader-theme">
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
-          <AppContent />
+          <NextStepProvider>
+            <NextStepReact 
+              steps={onboardingSteps} 
+              cardComponent={OnboardingCard}
+              shadowRgb="0, 0, 0"
+              shadowOpacity="0.80"
+              clickThroughOverlay={false}
+            >
+              <AppContent />
+            </NextStepReact>
+          </NextStepProvider>
           <Toaster />
         </TooltipProvider>
       </QueryClientProvider>
@@ -84,3 +97,4 @@ function App() {
 }
 
 export default App;
+

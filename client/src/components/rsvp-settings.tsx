@@ -1,4 +1,5 @@
 import { Settings, Gauge, Type, Zap, Clock } from "lucide-react";
+import { useNextStep } from "nextstepjs";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
@@ -32,14 +33,27 @@ export function RSVPSettingsSheet({
   maxWpm = 350,
   isPremium = false 
 }: RSVPSettingsProps) {
+  const { currentTour, currentStep, setCurrentStep } = useNextStep();
+  
   const updateSetting = <K extends keyof RSVPSettings>(key: K, value: RSVPSettings[K]) => {
     onSettingsChange({ ...settings, [key]: value });
+  };
+
+  const handleTriggerClick = () => {
+    if (currentTour === "onboardingTour" && currentStep === 7) {
+      setCurrentStep(8);
+    }
   };
 
   return (
     <Sheet>
       <SheetTrigger asChild>
-        <Button variant="ghost" size="icon" data-testid="button-settings">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          data-testid="button-settings"
+          onClick={handleTriggerClick}
+        >
           <Settings className="h-5 w-5" />
         </Button>
       </SheetTrigger>
@@ -63,7 +77,7 @@ export function RSVPSettingsSheet({
                   {settings.wpm} WPM
                 </span>
                 {!isPremium && settings.wpm >= maxWpm && (
-                  <span className="text-xs text-amber-500">Free tier limit</span>
+                  <span className="text-xs text-amber-500" id="onboarding-premium-info">Free tier limit</span>
                 )}
               </div>
               <Slider

@@ -226,7 +226,7 @@ export function RegisterPage() {
         firstName: data.firstName,
         lastName: data.lastName,
       });
-      navigate("/");
+      navigate("/?onboarding=true");
     } catch (error: any) {
       const message = error?.message || "Registration failed";
       toast({

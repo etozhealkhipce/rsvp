@@ -572,6 +572,16 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/default-books", async (_req: Request, res: Response) => {
+    try {
+      const books = await storage.getDefaultBooks();
+      res.json(books);
+    } catch (error) {
+      console.error("Error fetching default books:", error);
+      res.status(500).json({ message: "Failed to fetch default books" });
+    }
+  });
+
   app.get("/api/health", (_req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });

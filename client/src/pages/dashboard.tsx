@@ -1,7 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { Plus, BookOpen, Search, Library, Sparkles, Zap, ArrowRight } from "lucide-react";
-import { useLocation } from "wouter";
+import { useLocation, useSearch } from "wouter";
+import { useNextStep } from "nextstepjs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,7 +10,7 @@ import { Header } from "@/components/header";
 import { FileUpload } from "@/components/file-upload";
 import { TextCard } from "@/components/text-card";
 import { FloatingElementsLight } from "@/components/floating-elements";
-import { getAllTexts, deleteText, type StoredText } from "@/lib/indexeddb";
+import { getAllTexts, deleteText, saveText, generateId, type StoredText } from "@/lib/indexeddb";
 import { useToast } from "@/hooks/use-toast";
 
 import type { AuthUser } from "@shared/types/auth";
@@ -45,10 +46,67 @@ export function Dashboard({ user, subscriptionTier = "free" }: DashboardProps) {
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const { toast } = useToast();
   const [, navigate] = useLocation();
+  const searchString = useSearch();
+  const { startNextStep } = useNextStep();
+  const onboardingStarted = useRef(false);
 
   useEffect(() => {
     loadTexts();
   }, []);
+
+  // Handle onboarding flow
+  useEffect(() => {
+    const params = new URLSearchParams(searchString);
+    const shouldOnboard = params.get("onboarding") === "true";
+    
+    if (shouldOnboard && !onboardingStarted.current && !isLoading) {
+      onboardingStarted.current = true;
+      
+      // Clear the URL param
+      window.history.replaceState({}, "", "/");
+      
+      // Fetch and add default book, then start tour
+      const setupOnboarding = async () => {
+        try {
+          const response = await fetch("/api/default-books");
+          if (response.ok) {
+            const defaultBooks = await response.json();
+            if (defaultBooks.length > 0) {
+              const book = defaultBooks[0];
+              // Check if book already exists in IndexedDB
+              const existingTexts = await getAllTexts();
+              const alreadyExists = existingTexts.some(t => t.title === book.title);
+              
+              if (!alreadyExists) {
+                const newText: StoredText = {
+                  id: generateId(),
+                  title: book.title,
+                  content: book.content,
+                  wordCount: book.wordCount,
+                  currentWordIndex: 0,
+                  wpm: 250,
+                  lastReadAt: new Date(),
+                  createdAt: new Date(),
+                  fileType: "text",
+                };
+                await saveText(newText);
+                setTexts(prev => [newText, ...prev]);
+              }
+            }
+          }
+        } catch (error) {
+          console.error("Error setting up onboarding:", error);
+        }
+        
+        // Start the tour after a short delay to let UI render
+        setTimeout(() => {
+          startNextStep("onboardingTour");
+        }, 500);
+      };
+      
+      setupOnboarding();
+    }
+  }, [searchString, isLoading, startNextStep]);
 
   const loadTexts = async () => {
     try {
@@ -84,7 +142,7 @@ export function Dashboard({ user, subscriptionTier = "free" }: DashboardProps) {
   };
 
   const handleTextAdded = (newText: StoredText) => {
-    setTexts([newText, ...texts]);
+    setTexts((prev) => [newText, ...prev]);
   };
 
   const filteredTexts = texts.filter(text =>
@@ -205,6 +263,7 @@ export function Dashboard({ user, subscriptionTier = "free" }: DashboardProps) {
                 <TextCard
                   text={text}
                   onDelete={handleDeleteText}
+                  isFirstCard={index === 0}
                 />
               </motion.div>
             ))}

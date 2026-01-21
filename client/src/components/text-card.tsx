@@ -1,6 +1,7 @@
 import { FileText, Play, Trash2, Clock, BookOpen } from "lucide-react";
 import { Link } from "wouter";
 import { motion } from "framer-motion";
+import { useNextStep } from "nextstepjs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,9 +21,11 @@ import type { StoredText } from "@/lib/indexeddb";
 interface TextCardProps {
   text: StoredText;
   onDelete: (id: string) => void;
+  isFirstCard?: boolean;
 }
 
-export function TextCard({ text, onDelete }: TextCardProps) {
+export function TextCard({ text, onDelete, isFirstCard = false }: TextCardProps) {
+  const { currentTour, currentStep, setCurrentStep } = useNextStep();
   const progressPercent = text.wordCount > 0 
     ? Math.round((text.currentWordIndex / text.wordCount) * 100) 
     : 0;
@@ -45,6 +48,7 @@ export function TextCard({ text, onDelete }: TextCardProps) {
     <Card 
       className="group card-lift rounded-3xl border-0 bg-card/50 backdrop-blur overflow-visible" 
       data-testid={`card-text-${text.id}`}
+      id={isFirstCard ? "onboarding-sample-book" : undefined}
     >
       <CardContent className="p-6">
         <div className="flex items-start gap-4">
@@ -98,8 +102,19 @@ export function TextCard({ text, onDelete }: TextCardProps) {
             className="flex-1 rounded-full h-11 gradient-primary border-0 text-white" 
             asChild 
             data-testid="button-read"
+            id={isFirstCard ? "onboarding-start-reading" : undefined}
           >
-            <Link href={`/read/${text.id}`}>
+            <Link 
+              href={`/read/${text.id}`}
+              onClick={() => {
+                if (isFirstCard && currentTour === "onboardingTour" && currentStep === 2) {
+                  // Small delay to allow Reader page to mount before advancing tour step
+                  setTimeout(() => {
+                    setCurrentStep(3);
+                  }, 100);
+                }
+              }}
+            >
               <Play className="h-4 w-4 mr-2" />
               {progressPercent > 0 ? "Continue" : "Start Reading"}
             </Link>
