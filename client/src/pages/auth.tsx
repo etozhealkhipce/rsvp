@@ -96,7 +96,7 @@ export function LoginPage() {
             >
               <BookOpen className="h-5 w-5 text-white" />
             </motion.div>
-            <span className="font-bold text-xl">RSVP Reader</span>
+            <span className="font-bold text-xl hidden md:block">RSVP Reader</span>
           </motion.div>
           <ThemeToggle />
         </div>

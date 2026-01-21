@@ -73,7 +73,7 @@ export function LandingPage() {
             >
               <BookOpen className="h-5 w-5 text-white" />
             </motion.div>
-            <span className="font-bold text-xl">RSVP Reader</span>
+            <span className="font-bold text-xl hidden md:block">RSVP Reader</span>
           </motion.div>
           <motion.div 
             className="flex items-center gap-3"
@@ -114,7 +114,7 @@ export function LandingPage() {
               animate="visible"
             >
               <motion.div 
-                className="mb-8 inline-flex items-center gap-2 rounded-full glass px-5 py-2.5"
+                className="my-8 inline-flex items-center gap-2 rounded-full glass px-5 py-2.5"
                 variants={itemVariants}
               >
                 <Sparkles className="h-4 w-4 text-primary" />
@@ -179,7 +179,7 @@ export function LandingPage() {
             </motion.div>
 
             <motion.div 
-              className="mt-20 grid grid-cols-3 gap-6 max-w-2xl mx-auto"
+              className="my-20 grid grid-cols-3 gap-6 max-w-2xl mx-auto"
               initial={{ opacity: 0, y: 40 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.8, duration: 0.6 }}

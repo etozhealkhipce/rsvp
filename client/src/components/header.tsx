@@ -31,7 +31,7 @@ export function Header({ user, subscriptionTier = "free" }: HeaderProps) {
               className="font-bold text-xl hidden sm:inline-block group-hover:gradient-text transition-all"
               data-testid="text-logo"
             >
-              RSVP Reader
+                RSVP Reader
             </span>
           </Link>
 
