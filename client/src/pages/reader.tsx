@@ -6,9 +6,6 @@ import {
   Play,
   Pause,
   RotateCcw,
-  ChevronLeft,
-  ChevronRight,
-  Settings2,
   ArrowLeft,
   SkipBack,
   SkipForward,
@@ -28,6 +25,7 @@ import {
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import type { UserPreferences, Subscription } from "@shared/schema";
+import { useIsMobile } from "@/hooks/use-mobile";
 // Redundant navigate import removed
 
 interface RSVPSettings {
@@ -37,12 +35,16 @@ interface RSVPSettings {
   pauseOnPunctuation: boolean;
 }
 
+const MOBILE_FONT_SIZE = 40;
+const DESKTOP_FONT_SIZE = 64;
+
 export function ReaderPage() {
   const { id } = useParams();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { currentTour, currentStep, setCurrentStep } = useNextStep();
+  const isMobile = useIsMobile();
 
   const handleOnboardingClick = (
     action: "play-pause" | "skip-back" | "skip-forward" | "reset" | "settings",
@@ -63,9 +65,9 @@ export function ReaderPage() {
   const [words, setWords] = useState<string[]>([]);
   const [settings, setSettings] = useState<RSVPSettings>({
     wpm: 250,
-    fontSize: 64,
     gradualStart: true,
     pauseOnPunctuation: true,
+    fontSize: isMobile ? MOBILE_FONT_SIZE : DESKTOP_FONT_SIZE,
   });
 
   const [currentWpm, setCurrentWpm] = useState(settings.wpm);
@@ -476,7 +478,7 @@ export function ReaderPage() {
 
           <Progress value={progressPercent} className="h-1.5 mb-4" />
 
-          <div className="flex items-center justify-center gap-2">
+          <div className="flex items-center justify-center gap-2 pb-6 md:pb-0">
             <Button
               variant="ghost"
               size="icon"
@@ -531,7 +533,7 @@ export function ReaderPage() {
             </Button>
           </div>
 
-          <p className="text-center text-xs text-muted-foreground mt-4">
+          <p className="text-center text-xs text-muted-foreground mt-4 hidden md:block">
             Press{" "}
             <kbd className="px-1.5 py-0.5 bg-muted rounded text-[10px] font-mono">
               Space
