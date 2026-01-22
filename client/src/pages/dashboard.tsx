@@ -1,19 +1,25 @@
 import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { Plus, BookOpen, Search, Library, Sparkles, Zap, ArrowRight } from "lucide-react";
+import { Plus, Search, Library, Sparkles, Zap, ArrowRight } from "lucide-react";
 import { useLocation, useSearch } from "wouter";
 import { useNextStep } from "nextstepjs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Header } from "@/components/header";
-import { FileUpload } from "@/components/file-upload";
 import { TextCard } from "@/components/text-card";
 import { FloatingElementsLight } from "@/components/floating-elements";
-import { getAllTexts, deleteText, saveText, generateId, type StoredText } from "@/lib/indexeddb";
+import {
+  getAllTexts,
+  deleteText,
+  saveText,
+  generateId,
+  type StoredText,
+} from "@/lib/indexeddb";
 import { useToast } from "@/hooks/use-toast";
 
 import type { AuthUser } from "@shared/types/auth";
+import { AddTextModal } from "@/features/add-text";
 
 interface DashboardProps {
   user: AuthUser;
@@ -32,10 +38,10 @@ const containerVariants = {
 
 const itemVariants = {
   hidden: { opacity: 0, y: 20 },
-  visible: { 
-    opacity: 1, 
+  visible: {
+    opacity: 1,
     y: 0,
-    transition: { duration: 0.4, ease: "easeOut" }
+    transition: { duration: 0.4, ease: "easeOut" },
   },
 };
 
@@ -58,13 +64,13 @@ export function Dashboard({ user, subscriptionTier = "free" }: DashboardProps) {
   useEffect(() => {
     const params = new URLSearchParams(searchString);
     const shouldOnboard = params.get("onboarding") === "true";
-    
+
     if (shouldOnboard && !onboardingStarted.current && !isLoading) {
       onboardingStarted.current = true;
-      
+
       // Clear the URL param
       window.history.replaceState({}, "", "/");
-      
+
       // Fetch and add default book, then start tour
       const setupOnboarding = async () => {
         try {
@@ -75,8 +81,10 @@ export function Dashboard({ user, subscriptionTier = "free" }: DashboardProps) {
               const book = defaultBooks[0];
               // Check if book already exists in IndexedDB
               const existingTexts = await getAllTexts();
-              const alreadyExists = existingTexts.some(t => t.title === book.title);
-              
+              const alreadyExists = existingTexts.some(
+                (t) => t.title === book.title,
+              );
+
               if (!alreadyExists) {
                 const newText: StoredText = {
                   id: generateId(),
@@ -90,20 +98,20 @@ export function Dashboard({ user, subscriptionTier = "free" }: DashboardProps) {
                   fileType: "text",
                 };
                 await saveText(newText);
-                setTexts(prev => [newText, ...prev]);
+                setTexts((prev) => [newText, ...prev]);
               }
             }
           }
         } catch (error) {
           console.error("Error setting up onboarding:", error);
         }
-        
+
         // Start the tour after a short delay to let UI render
         setTimeout(() => {
           startNextStep("onboardingTour");
         }, 500);
       };
-      
+
       setupOnboarding();
     }
   }, [searchString, isLoading, startNextStep]);
@@ -127,7 +135,7 @@ export function Dashboard({ user, subscriptionTier = "free" }: DashboardProps) {
   const handleDeleteText = async (id: string) => {
     try {
       await deleteText(id);
-      setTexts(texts.filter(t => t.id !== id));
+      setTexts(texts.filter((t) => t.id !== id));
       toast({
         title: "Deleted",
         description: "Text has been removed from your library.",
@@ -145,18 +153,19 @@ export function Dashboard({ user, subscriptionTier = "free" }: DashboardProps) {
     setTexts((prev) => [newText, ...prev]);
   };
 
-  const filteredTexts = texts.filter(text =>
-    text.title.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredTexts = texts.filter((text) =>
+    text.title.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
-  const displayName = [user.firstName, user.lastName].filter(Boolean).join(" ") || "there";
+  const displayName =
+    [user.firstName, user.lastName].filter(Boolean).join(" ") || "there";
 
   return (
     <div className="min-h-screen bg-background">
       <Header user={user} subscriptionTier={subscriptionTier} />
-      
+
       <main className="container mx-auto max-w-7xl px-6 py-10">
-        <motion.div 
+        <motion.div
           className="mb-10"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -181,20 +190,23 @@ export function Dashboard({ user, subscriptionTier = "free" }: DashboardProps) {
               <CardContent className="relative p-8">
                 <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
                   <div className="flex items-start gap-5">
-                    <motion.div 
+                    <motion.div
                       className="h-14 w-14 rounded-2xl gradient-primary flex items-center justify-center flex-shrink-0"
                       whileHover={{ scale: 1.1, rotate: 5 }}
                     >
                       <Sparkles className="h-7 w-7 text-white" />
                     </motion.div>
                     <div>
-                      <h3 className="font-bold text-xl mb-2">Unlock Premium Features</h3>
+                      <h3 className="font-bold text-xl mb-2">
+                        Unlock Premium Features
+                      </h3>
                       <p className="text-muted-foreground max-w-md">
-                        Read up to 1000 WPM, get advanced settings, and enjoy unlimited reading.
+                        Read up to 1000 WPM, get advanced settings, and enjoy
+                        unlimited reading.
                       </p>
                     </div>
                   </div>
-                  <Button 
+                  <Button
                     onClick={() => navigate("/settings")}
                     className="rounded-full px-8 h-12 gradient-primary border-0 text-white glow-hover"
                     data-testid="button-upgrade"
@@ -208,7 +220,7 @@ export function Dashboard({ user, subscriptionTier = "free" }: DashboardProps) {
           </motion.div>
         )}
 
-        <motion.div 
+        <motion.div
           className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 mb-8"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -224,8 +236,8 @@ export function Dashboard({ user, subscriptionTier = "free" }: DashboardProps) {
               data-testid="input-search"
             />
           </div>
-          <Button 
-            onClick={() => setUploadDialogOpen(true)} 
+          <Button
+            onClick={() => setUploadDialogOpen(true)}
             className="rounded-full px-6 h-12 gradient-primary border-0 text-white"
             data-testid="button-add-text"
           >
@@ -252,7 +264,7 @@ export function Dashboard({ user, subscriptionTier = "free" }: DashboardProps) {
             ))}
           </div>
         ) : filteredTexts.length > 0 ? (
-          <motion.div 
+          <motion.div
             className="grid md:grid-cols-2 lg:grid-cols-3 gap-6"
             variants={containerVariants}
             initial="hidden"
@@ -277,18 +289,21 @@ export function Dashboard({ user, subscriptionTier = "free" }: DashboardProps) {
             <Card className="border-dashed border-2 rounded-3xl overflow-hidden relative">
               <FloatingElementsLight />
               <CardContent className="py-20 text-center relative z-10">
-                <motion.div 
+                <motion.div
                   className="h-20 w-20 rounded-3xl gradient-primary flex items-center justify-center mx-auto mb-6 glow-primary"
                   whileHover={{ scale: 1.1, rotate: 5 }}
                 >
                   <Library className="h-10 w-10 text-white" />
                 </motion.div>
-                <h3 className="font-bold text-2xl mb-3">Your library is empty</h3>
+                <h3 className="font-bold text-2xl mb-3">
+                  Your library is empty
+                </h3>
                 <p className="text-muted-foreground mb-8 max-w-sm mx-auto text-lg">
-                  Add your first text to start speed reading. Paste text or upload a .txt file.
+                  Add your first text to start speed reading. Paste text or
+                  upload a .txt file.
                 </p>
-                <Button 
-                  onClick={() => setUploadDialogOpen(true)} 
+                <Button
+                  onClick={() => setUploadDialogOpen(true)}
                   className="rounded-full px-8 h-12 gradient-primary border-0 text-white glow-hover"
                   data-testid="button-add-first-text"
                 >
@@ -299,10 +314,7 @@ export function Dashboard({ user, subscriptionTier = "free" }: DashboardProps) {
             </Card>
           </motion.div>
         ) : (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-          >
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             <Card className="border-dashed border-2 rounded-3xl">
               <CardContent className="py-16 text-center">
                 <Search className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -316,10 +328,10 @@ export function Dashboard({ user, subscriptionTier = "free" }: DashboardProps) {
         )}
       </main>
 
-      <FileUpload
+      <AddTextModal
         open={uploadDialogOpen}
-        onOpenChange={setUploadDialogOpen}
         onTextAdded={handleTextAdded}
+        handleClose={() => setUploadDialogOpen(false)}
       />
     </div>
   );
