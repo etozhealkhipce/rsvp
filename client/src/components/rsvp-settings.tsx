@@ -12,6 +12,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface RSVPSettings {
   wpm: number;
@@ -27,15 +28,19 @@ interface RSVPSettingsProps {
   isPremium?: boolean;
 }
 
-export function RSVPSettingsSheet({ 
-  settings, 
-  onSettingsChange, 
+export function RSVPSettingsSheet({
+  settings,
+  onSettingsChange,
   maxWpm = 350,
-  isPremium = false 
+  isPremium = false,
 }: RSVPSettingsProps) {
+  const isMobile = useIsMobile();
   const { currentTour, currentStep, setCurrentStep } = useNextStep();
-  
-  const updateSetting = <K extends keyof RSVPSettings>(key: K, value: RSVPSettings[K]) => {
+
+  const updateSetting = <K extends keyof RSVPSettings>(
+    key: K,
+    value: RSVPSettings[K],
+  ) => {
     onSettingsChange({ ...settings, [key]: value });
   };
 
@@ -48,16 +53,19 @@ export function RSVPSettingsSheet({
   return (
     <Sheet>
       <SheetTrigger asChild>
-        <Button 
-          variant="ghost" 
-          size="icon" 
+        <Button
+          variant="ghost"
+          size="icon"
           data-testid="button-settings"
           onClick={handleTriggerClick}
         >
           <Settings className="h-5 w-5" />
         </Button>
       </SheetTrigger>
-      <SheetContent>
+      <SheetContent
+        side={isMobile ? "bottom" : "right"}
+        className={isMobile ? "h-screen rounded-t-xl" : undefined}
+      >
         <SheetHeader>
           <SheetTitle>Reading Settings</SheetTitle>
           <SheetDescription>
@@ -77,7 +85,12 @@ export function RSVPSettingsSheet({
                   {settings.wpm} WPM
                 </span>
                 {!isPremium && settings.wpm >= maxWpm && (
-                  <span className="text-xs text-amber-500" id="onboarding-premium-info">Free tier limit</span>
+                  <span
+                    className="text-xs text-amber-500"
+                    id="onboarding-premium-info"
+                  >
+                    Free tier limit
+                  </span>
                 )}
               </div>
               <Slider
@@ -129,11 +142,13 @@ export function RSVPSettingsSheet({
               <Zap className="h-4 w-4 text-muted-foreground" />
               <Label className="font-medium">Advanced Options</Label>
             </div>
-            
+
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label htmlFor="gradual-start" className="text-sm">Gradual Start</Label>
+                  <Label htmlFor="gradual-start" className="text-sm">
+                    Gradual Start
+                  </Label>
                   <p className="text-xs text-muted-foreground">
                     Begin at 60% speed, gradually reaching full speed
                   </p>
@@ -141,14 +156,18 @@ export function RSVPSettingsSheet({
                 <Switch
                   id="gradual-start"
                   checked={settings.gradualStart}
-                  onCheckedChange={(checked) => updateSetting("gradualStart", checked)}
+                  onCheckedChange={(checked) =>
+                    updateSetting("gradualStart", checked)
+                  }
                   data-testid="switch-gradual-start"
                 />
               </div>
 
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label htmlFor="pause-punctuation" className="text-sm">Pause on Punctuation</Label>
+                  <Label htmlFor="pause-punctuation" className="text-sm">
+                    Pause on Punctuation
+                  </Label>
                   <p className="text-xs text-muted-foreground">
                     Add extra pause after periods and commas
                   </p>
@@ -156,7 +175,9 @@ export function RSVPSettingsSheet({
                 <Switch
                   id="pause-punctuation"
                   checked={settings.pauseOnPunctuation}
-                  onCheckedChange={(checked) => updateSetting("pauseOnPunctuation", checked)}
+                  onCheckedChange={(checked) =>
+                    updateSetting("pauseOnPunctuation", checked)
+                  }
                   data-testid="switch-pause-punctuation"
                 />
               </div>
