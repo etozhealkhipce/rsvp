@@ -1,5 +1,5 @@
-import { BookOpen, Library } from "lucide-react";
-import { Link, useLocation } from "wouter";
+import { BookOpen } from "lucide-react";
+import { Link } from "wouter";
 import { motion } from "framer-motion";
 import { ThemeToggle } from "./theme-toggle";
 import { UserMenu } from "./user-menu";
@@ -31,7 +31,7 @@ export function Header({ user, subscriptionTier = "free" }: HeaderProps) {
               className="font-bold text-xl hidden sm:inline-block group-hover:gradient-text transition-all"
               data-testid="text-logo"
             >
-                RSVP Reader
+              RSVP Reader
             </span>
           </Link>
 
