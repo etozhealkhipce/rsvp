@@ -175,7 +175,7 @@ export function UserMenu({ user, subscriptionTier = "free" }: UserMenuProps) {
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={handleLogout}
-          className="cursor-pointer text-destructive focus:text-destructive"
+          className="cursor-pointer text-destructive focus:text-destructive dark:focus:text-red-500 dark:text-red-500"
           disabled={isLoggingOut}
           data-testid="link-logout"
         >

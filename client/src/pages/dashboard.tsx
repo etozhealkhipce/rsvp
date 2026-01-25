@@ -149,8 +149,15 @@ export function Dashboard({ user, subscriptionTier = "free" }: DashboardProps) {
     }
   };
 
-  const handleTextAdded = (newText: StoredText) => {
+  const handleTextAdded = async (newText: StoredText) => {
     setTexts((prev) => [newText, ...prev]);
+
+    try {
+      const allTexts = await getAllTexts();
+      setTexts(allTexts);
+    } catch (error) {
+      console.error("Failed to refresh texts after adding:", error);
+    }
   };
 
   const filteredTexts = texts.filter((text) =>
