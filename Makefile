@@ -1,4 +1,4 @@
-.PHONY: dev down
+.PHONY: dev down reset
 
 dev:
 	docker-compose up -d database
@@ -7,3 +7,7 @@ dev:
 
 down:
 	docker-compose down
+
+reset:
+	docker-compose down -v
+	docker-compose up -d database
